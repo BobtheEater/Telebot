@@ -36,11 +36,6 @@ class MultipleChatBot:
                          "Остановить таймер":"stoptimer",
                          "Включить функционал":"functionality"}
 
-        #link commands with functions
-        dp.message.register(self.send_weekday_message,Command(commands=["startTimer","starttimer"]))
-        dp.message.register(self.stop,Command(commands=["stopTimer","stoptimer"]))
-        dp.message.register(self.rmme,Command(commands=["rmme","rmMe"]))
-        dp.message.register(self.addme,Command(commands=["addme","addMe"]))
         dp.message.register(self.greet,Command(commands=["menu","Menu"]))
 
         #link commands with buttons
@@ -87,31 +82,6 @@ class MultipleChatBot:
         await bot.send_message(chat_id=chat_id,text=text,parse_mode="MarkdownV2")
         logging.info(f"Message | {text} | sent at chat {chat_id}")
 
-    #Check if the timer is on, check if it's a weekday, send a message if it is or wait another cycle if not
-    async def send_weekday_message(self,message:Message):
-        chat_id = message.chat.id
-        if chat_id in self.running_chats and self.running_chats[chat_id]:
-            await bot.send_message(chat_id=chat_id, text="Таймер уже запущен")
-        else:
-            chat_name = message.chat.title if  message.chat.title else  message.chat.username
-            user = message.from_user.username if message.from_user.username else message.from_user.first_name
-            self.running = True
-            logging.info(f"Timer activated by {user} in chat {(chat_name,chat_id)}")
-            while self.running:
-                # Get the current datetime
-                now = datetime.now()
-                # Check if today is a weekday (Monday to Friday)
-                if now.weekday() < 5:  # Monday=0, Tuesday=1, ... , Sunday=6
-                    logging.info("Reminder sent at: " + str(now.strftime('%H:%M:%S')) + " in chat "+  chat_name +" next reminder at: " + (now + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S'))
-                    #Send the message
-                    await self.send_reminder(message.chat.id)
-                else:
-                    logging.info("Inapropriete time for a reminder: " + str(now.strftime('%H:%M:%S')) + " in chat "+  chat_name +" next attempt at: " + (now + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S'))
-                
-                # Wait before checking again
-                
-                await asyncio.sleep(self.sleepTime)
-
     async def send_weekday_message_callback(self, query: CallbackQuery):
         chat_id = query.message.chat.id
 
@@ -137,16 +107,7 @@ class MultipleChatBot:
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
 
-
     #Check if the timer is on and stop the timer if it is
-    async def stop(self,message: Message) -> None:
-        if self.running:
-            logging.info(f"Timer was stopped at {datetime.now().strftime('%d %H:%M:%S')} by {message.from_user.username if message.from_user.username else message.from_user.first_name} at chat {message.chat.id}")
-            self.running = False
-            await bot.send_message(chat_id=message.chat.id, text="Таймер остановлен")
-        else:
-            await bot.send_message(chat_id=message.chat.id, text="Таймер не запущен")
-
     async def stop_callback(self,query: CallbackQuery) -> None:
         chat_id = query.message.chat.id
         if chat_id in self.running_chats:
@@ -157,18 +118,7 @@ class MultipleChatBot:
             await query.message.answer(text="Таймер не запущен")
         await query.answer()
 
-    #removes a persons id, username and firstname from the set and notifies a user
-    async def rmme(self,message:Message):
-        if DBLoad.remove_member_from_list(message):
-            await bot.send_message(message.chat.id, text=f"Пользователь {message.from_user.first_name} был удален из списка") 
-            #Add the message details to the recorded set
-            logging.info(f"""User {(message.from_user.username,
-                                    message.from_user.first_name,
-                                    message.from_user.id,
-                                    message.chat.id)} removed from the set""")
-        else:
-            await bot.send_message(message.chat.id, text=f"Пользователь {message.from_user.first_name} не в списке")
-
+    #removes a persons id, username and firstname from the Database and notifies a user
     async def rmme_callback(self,query: CallbackQuery):
         if DBLoad.remove_member_from_list(query):
             await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был удален из списка") 
@@ -183,16 +133,6 @@ class MultipleChatBot:
         await query.answer()
 
     #adds a persons id, username and firstname to the set and sends a confirmation message 
-    async def addme(self,message: Message):
-        if DBLoad.add_member_to_list(message):
-            await bot.send_message(message.chat.id, text=f"Пользователь {message.from_user.first_name} был успешно добавлен в список")
-            logging.info(f"""User {(message.from_user.username,
-                                message.from_user.first_name,
-                                message.from_user.id,
-                                message.chat.id)} added to the set""")
-        else:
-            await bot.send_message(message.chat.id, text=f"Пользователь {message.from_user.first_name} уже в есть в списке") 
-        
     async def addme_callback(self,query: CallbackQuery):
         if DBLoad.add_member_to_list(query):
             await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был успешно добавлен в список")
