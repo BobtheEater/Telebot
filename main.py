@@ -25,7 +25,7 @@ dp = Dispatcher()
 class MultipleChatBot:
     def __init__(self,):
         self.running = False
-        self.sleepTime = 10 #5 * 60 * 60
+        self.sleepTime = 5 * 60 
         self.functionality = dict()
         self.oldMenu = dict() #keep the keyboard menu to delete later
         self.running_chats = dict() #dict to keep track of chat timers
@@ -114,7 +114,7 @@ class MultipleChatBot:
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
 
-        await self.timed_delete_message(chat_id,message_id=message.message_id, awaitTilDelete = 0)
+        await self.timed_delete_message(chat_id, message.message_id, 0)
 
     #Check if the timer is on and stop the timer if it is
     async def stop_callback(self,query: CallbackQuery) -> None:
