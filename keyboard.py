@@ -17,11 +17,13 @@ TOKEN = getenv("BOT_TOKEN")
 # Create bot and dispatcher
 dp = Dispatcher()
 
+notRowOptions = ["addme", "rmme"]
+
 # Function to generate the menu
 def generate_menu(menu_options : dict[str,str]):
     builder = InlineKeyboardBuilder()
     for option_text, callback_data in menu_options.items():
-        if callback_data == "addme" or callback_data == "rmme":
+        if callback_data in notRowOptions:
             builder.add(InlineKeyboardButton(
             text=option_text, callback_data=callback_data )
             )

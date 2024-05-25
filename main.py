@@ -44,28 +44,35 @@ class MultipleChatBot:
         dp.callback_query.register(self.stop_callback,F.data == "stoptimer")
         dp.callback_query.register(self.rmme_callback,F.data == "rmme")
         dp.callback_query.register(self.func,F.data == "functionality")
+    
+    #delete sent messages after a sleep time 
+    async def timed_delete_message(self, chat_id: int, message_id: int,  awaitTilDelete: int = 5):
+        await asyncio.sleep(awaitTilDelete)
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
 
     #send a menu for a user and delete and old one if exists
     async def greet(self, message: Message):
-        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        
         if message.chat.id in self.oldMenu:
            await bot.delete_message(chat_id=message.chat.id, message_id=self.oldMenu[message.chat.id])
 
+        bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         oldMenu = await bot.send_message(chat_id=message.chat.id, text = "Помощник ЗС готов помогать:", reply_markup=generate_menu(self.keyboard))
         self.oldMenu[message.chat.id] = oldMenu.message_id
 
     #Enables functionality (Useless)
     async def func(self, query:CallbackQuery):
         chat_id = query.message.chat.id
-        if self.functionality[chat_id]:
+        if self.functionality.get(chat_id):
             self.functionality[chat_id] = False
             text = "Функционал выключен"
+
         else:
             self.functionality[chat_id] = True
-            text = "Функционал включен"
-        await query.message.answer(text = text)
+            text = "Функционал включен"   
+
+        message = await query.message.answer(text = text)
         await query.answer()
+        await self.timed_delete_message(chat_id, message.message_id)
 
     #Send the reminder message taken from the Database
     async def send_reminder(self,chat_id):
@@ -86,7 +93,7 @@ class MultipleChatBot:
         chat_id = query.message.chat.id
 
         if chat_id in self.running_chats and self.running_chats[chat_id]:
-            await bot.send_message(chat_id=chat_id, text="Таймер уже запущен")
+            message =  await bot.send_message(chat_id=chat_id, text="Таймер уже запущен")
             await query.answer()
         else:
             chat_name = query.message.chat.title if  query.message.chat.title else  query.message.chat.username
@@ -94,7 +101,7 @@ class MultipleChatBot:
             self.running_chats[chat_id] = True
             logging.info(f"Timer activated by {user} in chat {(chat_name,chat_id)}")
             await query.answer()
-            await bot.send_message(chat_id=chat_id, text="Таймер запущен")
+            message = await bot.send_message(chat_id=chat_id, text="Таймер запущен")
             
             while self.running_chats[chat_id]:
                 now = datetime.now()
@@ -103,9 +110,11 @@ class MultipleChatBot:
                     await self.send_reminder(chat_id)
                 else:
                     logging.info(f"Inappropriate time for a reminder: {now.strftime('%H:%M:%S')} in chat {chat_name} next attempt at: {(now + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
-                
+
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
+
+        await self.timed_delete_message(chat_id,message_id=message.message_id, awaitTilDelete = 0)
 
     #Check if the timer is on and stop the timer if it is
     async def stop_callback(self,query: CallbackQuery) -> None:
@@ -113,38 +122,41 @@ class MultipleChatBot:
         if chat_id in self.running_chats:
             self.running_chats[chat_id] = False
             logging.info(f"Timer was stopped at {datetime.now().strftime('%d %H:%M:%S')} by {query.from_user.username if query.from_user.username else query.from_user.first_name} at chat {chat_id}")
-            await query.message.answer(text="Таймер остановлен")
+            message = await query.message.answer(text="Таймер остановлен")
         else:
-            await query.message.answer(text="Таймер не запущен")
+            message = await query.message.answer(text="Таймер не запущен")
         await query.answer()
+        await self.timed_delete_message(chat_id, message.message_id, 3)
 
     #removes a persons id, username and firstname from the Database and notifies a user
     async def rmme_callback(self,query: CallbackQuery):
         if DBLoad.remove_member_from_list(query):
-            await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был удален из списка") 
+            message =  await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был удален из списка") 
             #Add the message details to the recorded set
             logging.info(f"""User {(query.from_user.username,
                                 query.from_user.first_name,
                                 query.from_user.id,
                                 query.message.chat.id)} removed from the set""")
         else:
-            await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} не в списке")
+            message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} не в списке")
         
         await query.answer()
+        await self.timed_delete_message(message.chat.id, message.message_id)
 
     #adds a persons id, username and firstname to the set and sends a confirmation message 
     async def addme_callback(self,query: CallbackQuery):
         if DBLoad.add_member_to_list(query):
-            await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был успешно добавлен в список")
+            message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был успешно добавлен в список")
             #Add the message details to the recorded set
             logging.info(f"""User {(query.from_user.username,
                         query.from_user.first_name,
                         query.from_user.id,
                         query.message.chat.id,)} added to the set""")            
         else:
-            await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} уже в есть в списке") 
+            message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} уже в есть в списке") 
     
         await query.answer()
+        await self.timed_delete_message(message.chat.id, message.message_id)
 
 @dp.message(CommandStart())
 async def start(message: Message) -> None:
