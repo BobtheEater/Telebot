@@ -21,6 +21,7 @@ TOKEN = getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 # All handlers should be attached to the Router (or Dispatcher)
 dp = Dispatcher()
+bot_started = False
 
 #Test class function for multiple chats
 class MultipleChatBot:
@@ -62,18 +63,20 @@ class MultipleChatBot:
 
     #Enables functionality (Useless)
     async def func(self, query:CallbackQuery):
-        chat_id = query.message.chat.id
-        if self.functionality.get(chat_id):
-            self.functionality[chat_id] = False
+        chat = query.message.chat
+        user = query.from_user.username if query.from_user.username else query.from_user.first_name
+        if self.functionality.get(chat.id):
+            self.functionality[chat.id] = False
             text = "Функционал выключен"
-
+            logging.info(f"Functionality off in {(chat.id, chat.title if chat.title else chat.username)} by {user}")
         else:
-            self.functionality[chat_id] = True
+            self.functionality[chat.id] = True
             text = "Функционал включен"   
+            logging.info(f"Functionality on in {(chat.id, chat.title if chat.title else chat.username)} by {user}")
 
         message = await query.message.answer(text = text)
         await query.answer()
-        await self.timed_delete_message(chat_id, message.message_id)
+        await self.timed_delete_message(chat.id, message.message_id)
 
     #Send the reminder message taken from the Database
     async def send_reminder(self,chat_id):
@@ -84,50 +87,55 @@ class MultipleChatBot:
             if member["username"]:
                 text += f"@{ member["username"] } "
             else:
-                text += f"[{ member["first_name"] }(tg://user?id={ str(member["telegram_id"]) }) "
+                text += f"[{ member["first_name"] }](tg://user?id={ str(member["telegram_id"]) }) "
 
         text += call
         await bot.send_message(chat_id=chat_id,text=text,parse_mode="MarkdownV2")
         logging.info(f"Message | {text} | sent at chat {chat_id}")
 
     async def send_weekday_message_callback(self, query: CallbackQuery):
-        chat_id = query.message.chat.id
+        chat = query.message.chat
+        user = query.from_user.username if query.from_user.username else query.from_user.first_name
+        chat_name = chat.title if chat.title else chat.username
 
-        if chat_id in self.running_chats and self.running_chats[chat_id]:
-            message =  await bot.send_message(chat_id=chat_id, text="Таймер уже запущен")
+        if chat.id in self.running_chats and self.running_chats[chat.id]:
+            message =  await bot.send_message(chat_id=chat.id, text="Таймер уже запущен")
             await query.answer()
+            logging.info(f"{user} tried to activate timer in chat {(chat_name,chat.id)} while timer is already active")
         else:
-            chat_name = query.message.chat.title if  query.message.chat.title else  query.message.chat.username
-            user = query.from_user.username if query.from_user.username else query.from_user.first_name
-            self.running_chats[chat_id] = True
-            logging.info(f"Timer activated by {user} in chat {(chat_name,chat_id)}")
+            self.running_chats[chat.id] = True
+            logging.info(f"Timer activated by {user} in chat {(chat_name,chat.id)}")
             await query.answer()
-            message = await bot.send_message(chat_id=chat_id, text="Таймер запущен")
+            message = await bot.send_message(chat_id=chat.id, text="Таймер запущен")
             
-            while self.running_chats[chat_id]:
+            while self.running_chats[chat.id]:
                 now = datetime.now()
                 if now.weekday() < 5 and 6 <= now.hour <= 23:  # Monday=0, Tuesday=1, ... , Sunday=6
                     logging.info(f"Reminder sent at: {now.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(now + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
-                    await self.send_reminder(chat_id)
+                    await self.send_reminder(chat.id)
                 else:
                     logging.info(f"Inappropriate time for a reminder: {now.strftime('%H:%M:%S')} in chat {chat_name} next attempt at: {(now + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
 
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
 
-        await self.timed_delete_message(chat_id, message.message_id, 0)
+        await self.timed_delete_message(chat.id, message.message_id,  awaitTilDelete = 0)
 
     #Check if the timer is on and stop the timer if it is
     async def stop_callback(self,query: CallbackQuery) -> None:
-        chat_id = query.message.chat.id
-        if chat_id in self.running_chats:
-            self.running_chats[chat_id] = False
-            logging.info(f"Timer was stopped at {datetime.now().strftime('%d %H:%M:%S')} by {query.from_user.username if query.from_user.username else query.from_user.first_name} at chat {chat_id}")
+        chat = query.message.chat
+        user = query.from_user.username if query.from_user.username else query.from_user.first_name
+        chat_name = chat.title if chat.title else chat.username
+        user = query.from_user.username if query.from_user.username else query.from_user.first_name
+        if chat.id in self.running_chats:
+            self.running_chats[chat.id] = False
+            logging.info(f"Timer was stopped at {datetime.now().strftime('%d %H:%M:%S')} by {query.from_user.username if query.from_user.username else query.from_user.first_name} at chat {(chat_name,chat.id)}")
             message = await query.message.answer(text="Таймер остановлен")
         else:
             message = await query.message.answer(text="Таймер не запущен")
+            logging.info(f"{user} tried to stop the timer in chat {(chat_name,chat.id)} while timer is not active")
         await query.answer()
-        await self.timed_delete_message(chat_id, message.message_id, 3)
+        await self.timed_delete_message(chat.id, message.message_id, 3)
 
     #removes a persons id, username and firstname from the Database and notifies a user
     async def rmme_callback(self,query: CallbackQuery):
@@ -137,10 +145,13 @@ class MultipleChatBot:
             logging.info(f"""User {(query.from_user.username,
                                 query.from_user.first_name,
                                 query.from_user.id,
-                                query.message.chat.id)} removed from the set""")
+                                query.message.chat.id)} removed from the database""")
         else:
             message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} не в списке")
-        
+            logging.info(f"""User {(query.from_user.username,
+                                query.from_user.first_name,
+                                query.from_user.id,
+                                query.message.chat.id)} tried to be removed from the database and was not found""")
         await query.answer()
         await self.timed_delete_message(message.chat.id, message.message_id)
 
@@ -152,19 +163,33 @@ class MultipleChatBot:
             logging.info(f"""User {(query.from_user.username,
                         query.from_user.first_name,
                         query.from_user.id,
-                        query.message.chat.id,)} added to the set""")            
+                        query.message.chat.id,)} added to the database""")            
         else:
             message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} уже в есть в списке") 
-    
+            logging.info(f"""User {(query.from_user.username,
+                                query.from_user.first_name,
+                                query.from_user.id,
+                                query.message.chat.id)} tried to be added to the database and was found is the database""")
+            
         await query.answer()
         await self.timed_delete_message(message.chat.id, message.message_id)
 
+        @dp.message()
+        async def message_handler(message: Message):
+            pass
+
 @dp.message(CommandStart())
 async def start(message: Message) -> None:
+    global bot_started
     chat = message.chat
-    newbot = MultipleChatBot()
-    await newbot.greet(message)
-    logging.info(f"Bot instance created at chat {(chat.id, chat.title if chat.title else chat.username)}")
+    if not bot_started:
+        newbot = MultipleChatBot()
+        await newbot.greet(message)
+        bot_started = True
+        logging.info(f"Bot instance created at chat {(chat.id, chat.title if chat.title else chat.username)}")
+    else:
+        bot.send_message(text="Бот уже запущен \nНапиши /menu для визова меню")
+        logging.info(f"Bot instance creation attempt at chat {(chat.id, chat.title if chat.title else chat.username)}")
 
 async def main() -> None:
     await dp.start_polling(bot, allowed_updates=[], skip_updates=True)
