@@ -3,7 +3,7 @@ import logging
 import sys
 import DBLoad
 
-from webhook import app
+#from webhook import app
 from datetime import datetime, timedelta
 from os import getenv
 from aiohttp import web
@@ -167,13 +167,29 @@ async def start(message: Message) -> None:
     await newbot.greet(message)
     logging.info(f"Bot instance created at chat {(chat.id, chat.title if chat.title else chat.username)}")
 
-
 async def main() -> None:
-    #Initialize Bot instance with default bot properties which will be passed to all API calls
-    #And the run events dispatching
-    web.run_app(app, port = 8000)
-    await dp.start_polling(bot,allowed_updates=[])
+    await dp.start_polling(bot, allowed_updates=[], skip_updates=True)
+    
+async def webhook():
+    async def handle(request):
+        return web.Response(text="Bot is running")
 
+    # Create an instance of the aiohttp web application
+    app = web.Application()
+    app.router.add_get('/', handle)
+    
+    # Run the web application on port 8000
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, port=8000)
+    await site.start()
+
+# Define the function to run both coroutines concurrently
+async def create_coroutines():
+    await asyncio.gather(
+        main(),
+        webhook()
+    )
 
 if __name__ == "__main__":
     #Basic logging conf to with the utf-8 support
@@ -183,6 +199,6 @@ if __name__ == "__main__":
                         encoding='utf-8',
                         format='%(asctime)s - %(levelname)s - %(message)s',
                         datefmt='%d %H:%M:%S',)
-    asyncio.run(main())
     
+    asyncio.run(create_coroutines())
         
