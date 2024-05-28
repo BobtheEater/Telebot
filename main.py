@@ -3,8 +3,10 @@ import logging
 import sys
 import DBLoad
 
+from webhook import app
 from datetime import datetime, timedelta
 from os import getenv
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -169,8 +171,10 @@ async def start(message: Message) -> None:
 async def main() -> None:
     #Initialize Bot instance with default bot properties which will be passed to all API calls
     #And the run events dispatching
+    web.run_app(app, port = 8000)
     await dp.start_polling(bot,allowed_updates=[])
-        
+
+
 if __name__ == "__main__":
     #Basic logging conf to with the utf-8 support
     logging.basicConfig(level=logging.INFO,
