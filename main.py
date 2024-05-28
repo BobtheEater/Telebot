@@ -3,7 +3,6 @@ import logging
 import sys
 import DBLoad
 
-#from webhook import app
 from datetime import datetime, timedelta
 from os import getenv
 from aiohttp import web
@@ -169,7 +168,7 @@ async def start(message: Message) -> None:
 
 async def main() -> None:
     await dp.start_polling(bot, allowed_updates=[], skip_updates=True)
-    
+
 async def webhook():
     async def handle(request):
         return web.Response(text="Bot is running")
@@ -190,12 +189,13 @@ async def create_coroutines():
         main(),
         webhook()
     )
+    print("webhook setup")
 
 if __name__ == "__main__":
     #Basic logging conf to with the utf-8 support
     logging.basicConfig(level=logging.INFO,
-                        #stream=sys.stdout,
-                        filename="BotLogs.log",
+                        stream=sys.stdout,
+                        #filename="BotLogs.log",
                         encoding='utf-8',
                         format='%(asctime)s - %(levelname)s - %(message)s',
                         datefmt='%d %H:%M:%S',)
