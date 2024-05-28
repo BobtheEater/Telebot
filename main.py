@@ -25,7 +25,7 @@ dp = Dispatcher()
 class MultipleChatBot:
     def __init__(self,):
         self.running = False
-        self.sleepTime = 5 * 60 
+        self.sleepTime = 4 * 60 * 60 
         self.functionality = dict()
         self.oldMenu = dict() #keep the keyboard menu to delete later
         self.running_chats = dict() #dict to keep track of chat timers
@@ -55,8 +55,8 @@ class MultipleChatBot:
         if message.chat.id in self.oldMenu:
            await bot.delete_message(chat_id=message.chat.id, message_id=self.oldMenu[message.chat.id])
 
-        bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        oldMenu = await bot.send_message(chat_id=message.chat.id, text = "Помощник ЗС готов помогать:", reply_markup=generate_menu(self.keyboard))
+        await self.timed_delete_message(message.chat.id, message.message_id)
+        oldMenu = await bot.send_message(chat_id=message.chat.id, text = "Помощник ЗС готов помогать", reply_markup=generate_menu(self.keyboard))
         self.oldMenu[message.chat.id] = oldMenu.message_id
 
     #Enables functionality (Useless)
@@ -161,7 +161,6 @@ class MultipleChatBot:
 @dp.message(CommandStart())
 async def start(message: Message) -> None:
     chat = message.chat
-    await bot.delete_message(chat_id=chat.id, message_id=message.message_id)
     newbot = MultipleChatBot()
     await newbot.greet(message)
     logging.info(f"Bot instance created at chat {(chat.id, chat.title if chat.title else chat.username)}")
