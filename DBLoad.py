@@ -41,6 +41,7 @@ def remove_member_from_list(call: Message | CallbackQuery):
             session.commit()
             return True 
         except (NoResultFound, MultipleResultsFound):
+            session.commit()
             return False
         
 def add_member_to_list(call: Message | CallbackQuery):
@@ -54,8 +55,9 @@ def add_member_to_list(call: Message | CallbackQuery):
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
         try: 
             statement.one()
+            session.commit()
             return False
-        except (NoResultFound, MultipleResultsFound):
+        except (NoResultFound):
             session.add(member)
             session.commit()
             return True
