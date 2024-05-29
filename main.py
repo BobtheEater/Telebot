@@ -3,7 +3,7 @@ import logging
 import sys
 import DBLoad
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from os import getenv
 from aiohttp import web
 
@@ -109,12 +109,16 @@ class MultipleChatBot:
             message = await bot.send_message(chat_id=chat.id, text="Таймер запущен")
             
             while self.running_chats[chat.id]:
-                now = datetime.now()
-                if now.weekday() < 5 and 6 <= now.hour <= 23:  # Monday=0, Tuesday=1, ... , Sunday=6
-                    logging.info(f"Reminder sent at: {now.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(now + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
+                #timezone change to GMT+3 because the server runs UTC
+                utc_now = datetime.now(timezone.utc)
+                gmt_plus_3 = timezone(timedelta(hours=3))
+                gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
+                if gmt_plus_3_time.weekday() < 5 and 6 <= gmt_plus_3_time.hour <= 23:  # Monday=0, Tuesday=1, ... , Sunday=6
+                    logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
                     await self.send_reminder(chat.id)
+                
                 else:
-                    logging.info(f"Inappropriate time for a reminder: {now.strftime('%H:%M:%S')} in chat {chat_name} next attempt at: {(now + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
+                    logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next attempt at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
 
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
@@ -127,10 +131,12 @@ class MultipleChatBot:
         user = query.from_user.username if query.from_user.username else query.from_user.first_name
         chat_name = chat.title if chat.title else chat.username
         user = query.from_user.username if query.from_user.username else query.from_user.first_name
+       
         if chat.id in self.running_chats:
             self.running_chats[chat.id] = False
             logging.info(f"Timer was stopped at {datetime.now().strftime('%d %H:%M:%S')} by {query.from_user.username if query.from_user.username else query.from_user.first_name} at chat {(chat_name,chat.id)}")
             message = await query.message.answer(text="Таймер остановлен")
+        
         else:
             message = await query.message.answer(text="Таймер не запущен")
             logging.info(f"{user} tried to stop the timer in chat {(chat_name,chat.id)} while timer is not active")
