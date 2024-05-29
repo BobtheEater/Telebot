@@ -57,9 +57,9 @@ class MultipleChatBot:
         if message.chat.id in self.oldMenu:
            await bot.delete_message(chat_id=message.chat.id, message_id=self.oldMenu[message.chat.id])
 
-        await self.timed_delete_message(message.chat.id, message.message_id)
         oldMenu = await bot.send_message(chat_id=message.chat.id, text = "Помощник ЗС готов помогать", reply_markup=generate_menu(self.keyboard))
         self.oldMenu[message.chat.id] = oldMenu.message_id
+        await self.timed_delete_message(message.chat.id, message.message_id, 0)
 
     #Enables functionality (Useless)
     async def func(self, query:CallbackQuery):

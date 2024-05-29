@@ -1,6 +1,7 @@
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 
+from os import getenv
 from aiogram.types import Message, CallbackQuery
 #Database setup
 
@@ -12,9 +13,8 @@ class Member(SQLModel, table=True):
     telegram_id: int = Field(index=True)
     chat_id: int = Field(index=True)
 
-sqlite_file_name = "allience.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-engine = create_engine(sqlite_url, echo=False)
+DB_URL = getenv("DB_URL")
+engine = create_engine(DB_URL, echo=False)
 #End database setup
 
 def to_dict(obj):
