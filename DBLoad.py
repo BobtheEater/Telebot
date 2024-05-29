@@ -1,10 +1,10 @@
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy.engine import URL
 
 from os import getenv
 from aiogram.types import Message, CallbackQuery
 #Database setup
-
 
 class Member(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -13,8 +13,16 @@ class Member(SQLModel, table=True):
     telegram_id: int = Field(index=True)
     chat_id: int = Field(index=True)
 
-DB_URL = getenv("DB_URL")
-engine = create_engine(DB_URL, echo=False)
+connection_string = URL.create(
+    drivername = "mysql",
+    username = "avnadmin",
+    password = "AVNS_Z5L5KnaciZGPX-hq1AT",
+    host = "allience-alliencedb.i.aivencloud.com",
+    port = 28670,
+    database = "defaultdb",
+)
+
+engine = create_engine(connection_string)
 #End database setup
 
 def to_dict(obj):

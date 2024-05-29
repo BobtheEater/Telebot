@@ -19,7 +19,7 @@ from keyboard import generate_menu
 #Bot setup
 TOKEN = getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-# All handlers should be attached to the Router (or Dispatcher)
+
 dp = Dispatcher()
 bot_started = False
 
@@ -194,7 +194,7 @@ async def start(message: Message) -> None:
         bot_started = True
         logging.info(f"Bot instance created at chat {(chat.id, chat.title if chat.title else chat.username)}")
     else:
-        bot.send_message(text="Бот уже запущен \nНапиши /menu для визова меню")
+        await bot.send_message(chat_id = chat.id ,text="Бот уже запущен \nНапиши /menu для визова меню")
         logging.info(f"Bot instance creation attempt at chat {(chat.id, chat.title if chat.title else chat.username)}")
 
 async def main() -> None:
@@ -231,5 +231,4 @@ if __name__ == "__main__":
                         format='%(asctime)s - %(levelname)s - %(message)s',
                         datefmt='%d %H:%M:%S',)
     
-    asyncio.run(create_coroutines())
-        
+    asyncio.run(create_coroutines())     
