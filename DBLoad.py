@@ -4,8 +4,8 @@ from sqlalchemy.engine import URL
 
 from os import getenv
 from aiogram.types import Message, CallbackQuery
-#Database setup
 
+#Database setup
 class Member(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     username: str | None
