@@ -35,12 +35,19 @@ def get_members_by_chat(chat_id: int):
         membersDict = [to_dict(member) for member in listOfMembers]
     return membersDict
 
+def get_all_members():
+    with Session(engine) as session:
+        listOfMembers = session.exec(select(Member))
+        #Have to convert to dict beacouse you can't pass a query without a session
+        membersDict = [to_dict(member) for member in listOfMembers]
+    return membersDict
+
 def remove_member_from_list(call: Message | CallbackQuery):
     member = Member(
             username = call.from_user.username,
-            first_name = call.from_user.first_name,
+            first_name = call.from_user.first_name if call.from_user.first_name else call.from_user.last_name,
             telegram_id = call.from_user.id,
-            chat_id = call.chat.id if isinstance(call, Message) else call.message.chat.id
+            chat_id = call.chat.id if isinstance(call, Message) else call.message.chat.id,
         )
     with Session(engine) as session:
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
@@ -55,7 +62,7 @@ def remove_member_from_list(call: Message | CallbackQuery):
 def add_member_to_list(call: Message | CallbackQuery):
     member = Member(
             username = call.from_user.username,
-            first_name = call.from_user.first_name,
+            first_name = call.from_user.first_name if call.from_user.first_name else call.from_user.last_name,
             telegram_id = call.from_user.id,
             chat_id = call.chat.id if isinstance(call, Message) else call.message.chat.id
         )   

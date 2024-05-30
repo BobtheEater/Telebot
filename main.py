@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import DBLoad
+import re
 
 from datetime import datetime, timedelta, timezone
 from os import getenv
@@ -13,6 +14,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.filters.command import Command
 from aiogram.types import Message, CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
 
 from keyboard import generate_menu
 
@@ -46,6 +48,8 @@ class MultipleChatBot:
         dp.callback_query.register(self.stop_callback,F.data == "stoptimer")
         dp.callback_query.register(self.rmme_callback,F.data == "rmme")
         dp.callback_query.register(self.func,F.data == "functionality")
+
+        dp.message.register(self.get_all_members, Command("checkall"))
     
     #delete sent messages after a sleep time 
     async def timed_delete_message(self, chat_id: int, message_id: int,  awaitTilDelete: int = 5):
@@ -79,19 +83,35 @@ class MultipleChatBot:
         await self.timed_delete_message(chat.id, message.message_id)
 
     #Send the reminder message taken from the Database
-    async def send_reminder(self,chat_id):
+    async def send_reminder(self, chat_id):
         call = "\nЗаходим на ЗС"
         text = " "
-        membersDict =  DBLoad.get_members_by_chat(chat_id=chat_id)
-        for member in  membersDict:
+        membersDict = DBLoad.get_members_by_chat(chat_id=chat_id)
+        for member in membersDict:
             if member["username"]:
-                text += f"@{ member["username"] } "
+                text += f"@{self.escape_markdown_v2(member['username'])} "
             else:
-                text += f"[{ member["first_name"] }](tg://user?id={ str(member["telegram_id"]) }) "
+                first_name = self.escape_markdown_v2(member['first_name'])
+                text += f"[{first_name}](tg://user?id={member['telegram_id']}) "
 
-        text += call
-        await bot.send_message(chat_id=chat_id,text=text,parse_mode="MarkdownV2")
+        text += call  
+        await bot.send_message(chat_id=chat_id, text=text, parse_mode="MarkdownV2")
         logging.info(f"Message | {text} | sent at chat {chat_id}")
+
+    def escape_markdown_v2(self,text):
+        escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!' ]
+        escaped_text = ""
+        for char in text:
+            if char in escape_chars:
+                escaped_text += "\\" + char
+            else:
+                escaped_text += char
+        return escaped_text
+    
+    async def get_all_members(self, message: Message):
+        allMembers = DBLoad.get_all_members()
+        for member in allMembers:
+            await bot.send_message(chat_id=message.chat.id, text=str(member))
 
     async def send_weekday_message_callback(self, query: CallbackQuery):
         chat = query.message.chat
