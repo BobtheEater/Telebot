@@ -1,5 +1,5 @@
 from sqlmodel import Field, Session, SQLModel, create_engine, select, delete, BigInteger,Column
-from sqlalchemy.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy.exc import NoResultFound, MultipleResultsFound, OperationalError
 from sqlalchemy.engine import URL
 
 from os import getenv
@@ -25,30 +25,47 @@ connection_string = URL.create(
 engine = create_engine(connection_string)
 #End database setup
 
+#convert sqlmodel object to dict, needed beacause you cand pass the object out of session 
 def to_dict(obj):
     return {column.name: getattr(obj, column.name) for column in obj.__table__.columns}
 
-def get_members_by_chat(chat_id: int):
-    with Session(engine) as session:
-        listOfMembers = session.exec(select(Member).where(Member.chat_id == chat_id))
-        #Have to convert to dict beacouse you can't pass a query without a session
-        membersDict = [to_dict(member) for member in listOfMembers]
-    return membersDict
-
-def get_all_members():
-    with Session(engine) as session:
-        listOfMembers = session.exec(select(Member))
-        #Have to convert to dict beacouse you can't pass a query without a session
-        membersDict = [to_dict(member) for member in listOfMembers]
-    return membersDict
-
-def remove_member_from_list(call: Message | CallbackQuery):
+def call_to_member(call: Message | CallbackQuery):
     member = Member(
             username = call.from_user.username,
-            first_name = call.from_user.first_name if call.from_user.first_name else call.from_user.last_name,
+            #in case someone doesnt have a first name treat the last name as first 
+            first_name = call.from_user.first_name if call.from_user.first_name else call.from_user.last_name, 
             telegram_id = call.from_user.id,
-            chat_id = call.chat.id if isinstance(call, Message) else call.message.chat.id,
+            #check if the call was from a message just in case
+            chat_id = call.chat.id if isinstance(call, Message) else call.message.chat.id, 
         )
+    return member
+
+#func for selecting all members in a chat
+def get_members_by_chat(chat_id: int):
+    try:
+        with Session(engine) as session:
+            listOfMembers = session.exec(select(Member).where(Member.chat_id == chat_id))
+            #Have to convert to dict beacouse you can't pass a query without a session
+            membersDict = [to_dict(member) for member in listOfMembers]
+
+    #if connection to the database is lost - retry
+    except(OperationalError):
+        membersDict = get_members_by_chat(chat_id)  
+    return membersDict
+
+#func for selecting all members 
+def get_all_members():
+    try:
+        with Session(engine) as session:
+            listOfMembers = session.exec(select(Member))
+            membersDict = [to_dict(member) for member in listOfMembers]
+    except(OperationalError):
+        membersDict = get_all_members()
+    return membersDict
+
+#remove member from the database
+def remove_member_from_list(call: Message | CallbackQuery):
+    member = call_to_member(call)
     with Session(engine) as session:
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
         try: 
@@ -58,14 +75,10 @@ def remove_member_from_list(call: Message | CallbackQuery):
         except (NoResultFound, MultipleResultsFound):
             session.commit()
             return False
-        
+
+#add member to the databasae     
 def add_member_to_list(call: Message | CallbackQuery):
-    member = Member(
-            username = call.from_user.username,
-            first_name = call.from_user.first_name if call.from_user.first_name else call.from_user.last_name,
-            telegram_id = call.from_user.id,
-            chat_id = call.chat.id if isinstance(call, Message) else call.message.chat.id
-        )   
+    member = call_to_member(call)
     with Session(engine) as session:
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
         try: 
@@ -77,6 +90,7 @@ def add_member_to_list(call: Message | CallbackQuery):
             session.commit()
             return True
         
+#if this code is run directly will drop the table and create a a new empty copy 
 if __name__ == "__main__":
     with Session(engine) as session:
         statement = delete(Member)

@@ -2,7 +2,6 @@ import asyncio
 import logging
 import sys
 import DBLoad
-import re
 
 from datetime import datetime, timedelta, timezone
 from os import getenv
@@ -13,8 +12,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.filters.command import Command
-from aiogram.types import Message, CallbackQuery
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import Message, CallbackQuery, Chat
 
 from keyboard import generate_menu
 
@@ -38,11 +36,13 @@ class MultipleChatBot:
                          "Убери меня":"rmme",
                          "Начать таймер":"starttimer",
                          "Остановить таймер":"stoptimer",
+                         "Отправить напоминание":"sendreminder",
                          "Включить функционал":"functionality"}
 
         dp.message.register(self.greet,Command(commands=["menu","Menu"]))
 
         #link commands with buttons
+        dp.callback_query.register(self.send_single_reminder_callback,F.data == "sendreminder")
         dp.callback_query.register(self.send_weekday_message_callback,F.data == "starttimer")
         dp.callback_query.register(self.addme_callback,F.data == "addme")
         dp.callback_query.register(self.stop_callback,F.data == "stoptimer")
@@ -82,23 +82,8 @@ class MultipleChatBot:
         await query.answer()
         await self.timed_delete_message(chat.id, message.message_id)
 
-    #Send the reminder message taken from the Database
-    async def send_reminder(self, chat_id):
-        call = "\nЗаходим на ЗС"
-        text = " "
-        membersDict = DBLoad.get_members_by_chat(chat_id=chat_id)
-        for member in membersDict:
-            if member["username"]:
-                text += f"@{self.escape_markdown_v2(member['username'])} "
-            else:
-                first_name = self.escape_markdown_v2(member['first_name'])
-                text += f"[{first_name}](tg://user?id={member['telegram_id']}) "
-
-        text += call  
-        await bot.send_message(chat_id=chat_id, text=text, parse_mode="MarkdownV2")
-        logging.info(f"Message | {text} | sent at chat {chat_id}")
-
-    def escape_markdown_v2(self,text):
+    #escape the special characters in usernames and first and second name's
+    def escape_markdown_v2(self, text:str):
         escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!' ]
         escaped_text = ""
         for char in text:
@@ -108,16 +93,40 @@ class MultipleChatBot:
                 escaped_text += char
         return escaped_text
     
-    async def get_all_members(self, message: Message):
-        allMembers = DBLoad.get_all_members()
-        for member in allMembers:
-            await bot.send_message(chat_id=message.chat.id, text=str(member))
+    #Send the reminder message taken from the Database
+    async def send_reminder(self, chat:Chat):
+        call = "\nЗаходим на ЗС"
+        text = " "
+        chat_name = chat.title if chat.title else chat.username
+        membersDict = DBLoad.get_members_by_chat(chat_id=chat.id)
 
+        for member in membersDict:
+            if member["username"]:
+                text += f"@{self.escape_markdown_v2(member['username'])} "
+            else:
+                first_name = self.escape_markdown_v2(member['first_name'])
+                text += f"[{first_name}](tg://user?id={member['telegram_id']}) "
+
+        text += call  
+        await bot.send_message(chat_id=chat.id, text=text, parse_mode="MarkdownV2")
+        logging.info(f"Message | {text} | sent at chat {(chat_name, chat.id)}")
+
+    async def send_single_reminder_callback(self, query: CallbackQuery):
+        chat = query.message.chat
+        user = query.from_user.username if query.from_user.username else query.from_user.first_name
+
+        logging.info(f"Single reminder sent by {user}")
+        await self.send_reminder(chat=chat)
+
+        query.answer()
+
+    #send a reminder by GMT+3 time every cycle(sleepTime)
     async def send_weekday_message_callback(self, query: CallbackQuery):
         chat = query.message.chat
         user = query.from_user.username if query.from_user.username else query.from_user.first_name
         chat_name = chat.title if chat.title else chat.username
 
+        #Check if the timer is already running in the chat
         if chat.id in self.running_chats and self.running_chats[chat.id]:
             message =  await bot.send_message(chat_id=chat.id, text="Таймер уже запущен")
             await query.answer()
@@ -127,12 +136,14 @@ class MultipleChatBot:
             logging.info(f"Timer activated by {user} in chat {(chat_name,chat.id)}")
             await query.answer()
             message = await bot.send_message(chat_id=chat.id, text="Таймер запущен")
-            
+            await self.timed_delete_message(chat.id, message.message_id,  awaitTilDelete = 3)
+
             while self.running_chats[chat.id]:
                 #timezone change to GMT+3 because the server runs UTC
                 utc_now = datetime.now(timezone.utc)
                 gmt_plus_3 = timezone(timedelta(hours=3))
                 gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
+
                 if gmt_plus_3_time.weekday() < 5 and 6 <= gmt_plus_3_time.hour <= 23:  # Monday=0, Tuesday=1, ... , Sunday=6
                     logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
                     await self.send_reminder(chat.id)
@@ -143,18 +154,20 @@ class MultipleChatBot:
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
 
-        await self.timed_delete_message(chat.id, message.message_id,  awaitTilDelete = 0)
-
-    #Check if the timer is on and stop the timer if it is
+    #stop the timer in a chat
     async def stop_callback(self,query: CallbackQuery) -> None:
         chat = query.message.chat
         user = query.from_user.username if query.from_user.username else query.from_user.first_name
         chat_name = chat.title if chat.title else chat.username
-        user = query.from_user.username if query.from_user.username else query.from_user.first_name
-       
+
+        utc_now = datetime.now(timezone.utc)
+        gmt_plus_3 = timezone(timedelta(hours=3))
+        gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
+        
+        #check if the timer is on in a chat
         if chat.id in self.running_chats:
             self.running_chats[chat.id] = False
-            logging.info(f"Timer was stopped at {datetime.now().strftime('%d %H:%M:%S')} by {query.from_user.username if query.from_user.username else query.from_user.first_name} at chat {(chat_name,chat.id)}")
+            logging.info(f"Timer was stopped at {gmt_plus_3_time.strftime('%d %H:%M:%S')} by {user} at chat {(chat_name,chat.id)}")
             message = await query.message.answer(text="Таймер остановлен")
         
         else:
@@ -163,11 +176,17 @@ class MultipleChatBot:
         await query.answer()
         await self.timed_delete_message(chat.id, message.message_id, 3)
 
-    #removes a persons id, username and firstname from the Database and notifies a user
+    #secret command to get all of the database entries
+    async def get_all_members(self, message: Message):
+        allMembers = DBLoad.get_all_members()
+        for member in allMembers:
+            await bot.send_message(chat_id=message.chat.id, text=str(member))
+
+    #removes a users id, username and firstname from the Database and notifies a user
     async def rmme_callback(self,query: CallbackQuery):
+        #check if the user is in the database
         if DBLoad.remove_member_from_list(query):
             message =  await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был удален из списка") 
-            #Add the message details to the recorded set
             logging.info(f"""User {(query.from_user.username,
                                 query.from_user.first_name,
                                 query.from_user.id,
@@ -183,13 +202,14 @@ class MultipleChatBot:
 
     #adds a persons id, username and firstname to the set and sends a confirmation message 
     async def addme_callback(self,query: CallbackQuery):
+        #check if the person is not in the database
         if DBLoad.add_member_to_list(query):
             message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был успешно добавлен в список")
-            #Add the message details to the recorded set
             logging.info(f"""User {(query.from_user.username,
                         query.from_user.first_name,
                         query.from_user.id,
-                        query.message.chat.id,)} added to the database""")            
+                        query.message.chat.id,)} added to the database""")      
+                  
         else:
             message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} уже в есть в списке") 
             logging.info(f"""User {(query.from_user.username,
@@ -200,6 +220,7 @@ class MultipleChatBot:
         await query.answer()
         await self.timed_delete_message(message.chat.id, message.message_id)
 
+        #handler for all messagess, so you won't get "Update not handled"
         @dp.message()
         async def message_handler(message: Message):
             pass
