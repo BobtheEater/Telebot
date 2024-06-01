@@ -3,6 +3,7 @@ import logging
 import sys
 import DBLoad
 
+from random import randint
 from datetime import datetime, timedelta, timezone
 from os import getenv
 from aiohttp import web
@@ -34,10 +35,14 @@ class MultipleChatBot:
 
         self.keyboard = {"Добавь меня":"addme",
                          "Убери меня":"rmme",
-                         "Начать таймер":"starttimer",
-                         "Остановить таймер":"stoptimer",
                          "Отправить напоминание":"sendreminder",
-                         "Включить функционал":"functionality"}
+                        }
+        
+        #respective functions don't work for now
+        """"Начать таймер":"starttimer",
+        "Остановить таймер":"stoptimer","""
+        #Someone doesn't want this
+        #"Включить функционал":"functionality"
 
         dp.message.register(self.greet,Command(commands=["menu","Menu"]))
 
@@ -107,8 +112,16 @@ class MultipleChatBot:
                 first_name = self.escape_markdown_v2(member['first_name'])
                 text += f"[{first_name}](tg://user?id={member['telegram_id']}) "
 
-        text += call  
-        await bot.send_message(chat_id=chat.id, text=text, parse_mode="MarkdownV2")
+        rand = randint(1, 100)
+        print(rand)
+        if rand in list(range(1, 15)):
+            await bot.send_message(chat_id=chat.id, text=text, parse_mode="MarkdownV2")
+            sticker = "CAACAgIAAxkBAAEF1bJmWtS_n1brWEZ2QBFzuxThLLHSFgACKQADaAyqFpujaoKf4jVgNQQ"
+            await bot.send_sticker(chat_id=chat.id,sticker=sticker)
+        else:
+            text += call  
+            await bot.send_message(chat_id=chat.id, text=text, parse_mode="MarkdownV2")
+       
         logging.info(f"Message | {text} | sent at chat {(chat_name, chat.id)}")
 
     async def send_single_reminder_callback(self, query: CallbackQuery):
@@ -118,7 +131,7 @@ class MultipleChatBot:
         logging.info(f"Single reminder sent by {user}")
         await self.send_reminder(chat=chat)
 
-        query.answer()
+        await query.answer()
 
     #send a reminder by GMT+3 time every cycle(sleepTime)
     async def send_weekday_message_callback(self, query: CallbackQuery):
