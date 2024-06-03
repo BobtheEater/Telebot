@@ -2,7 +2,9 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select, delete, Bi
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound, OperationalError
 from sqlalchemy.engine import URL
 
+from dotenv import load_dotenv
 from os import getenv
+
 from aiogram.types import Message, CallbackQuery
 
 #Database setup
@@ -13,13 +15,15 @@ class Member(SQLModel, table=True):
     telegram_id: int = Field(sa_column=Column(BigInteger()))
     chat_id: int = Field(sa_column=Column(BigInteger()))
 
+#added dotenv to hide info
+load_dotenv()
 connection_string = URL.create(
-    drivername = "mysql",
-    username = "avnadmin",
-    password = "AVNS_Z5L5KnaciZGPX-hq1AT",
-    host = "allience-alliencedb.i.aivencloud.com",
-    port = 28670,
-    database = "defaultdb",
+    drivername = getenv("DRIVERNAME"),
+    username = getenv("USERNAME"),
+    password = getenv("PASSWORD"),
+    host = getenv("HOST"),
+    port = getenv("PORT"),
+    database = getenv("DATABASE"),
 )
 
 engine = create_engine(connection_string)
@@ -54,7 +58,7 @@ def get_members_by_chat(chat_id: int):
     return membersDict
 
 #func for selecting all members 
-def get_all_members():
+def get_all_members() -> dict[str: str|int]:
     try:
         with Session(engine) as session:
             listOfMembers = session.exec(select(Member))

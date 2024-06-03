@@ -28,7 +28,8 @@ bot_started = False
 class MultipleChatBot:
     def __init__(self,):
         self.running = False
-        self.sleepTime = 4 * 60 * 60 
+        self.sleepTime = 10 * 60 
+        self.lastReminder = dict() #dict to keep track of the last hour of a sent reminder
         self.functionality = dict()
         self.oldMenu = dict() #keep the keyboard menu to delete later
         self.running_chats = dict() #dict to keep track of chat timers
@@ -36,11 +37,12 @@ class MultipleChatBot:
         self.keyboard = {"Добавь меня":"addme",
                          "Убери меня":"rmme",
                          "Отправить напоминание":"sendreminder",
+                         "Начать таймер":"starttimer",
+                         "Остановить таймер":"stoptimer",
                         }
         
         #respective functions don't work for now
-        """"Начать таймер":"starttimer",
-        "Остановить таймер":"stoptimer","""
+
         #Someone doesn't want this
         #"Включить функционал":"functionality"
 
@@ -112,9 +114,7 @@ class MultipleChatBot:
                 first_name = self.escape_markdown_v2(member['first_name'])
                 text += f"[{first_name}](tg://user?id={member['telegram_id']}) "
 
-        rand = randint(1, 100)
-        print(rand)
-        if rand in list(range(1, 15)):
+        if randint(1, 100) in list(range(1, 15)):
             await bot.send_message(chat_id=chat.id, text=text, parse_mode="MarkdownV2")
             sticker = "CAACAgIAAxkBAAEF1bJmWtS_n1brWEZ2QBFzuxThLLHSFgACKQADaAyqFpujaoKf4jVgNQQ"
             await bot.send_sticker(chat_id=chat.id,sticker=sticker)
@@ -145,30 +145,42 @@ class MultipleChatBot:
             await query.answer()
             logging.info(f"{user} tried to activate timer in chat {(chat_name,chat.id)} while timer is already active")
         else:
+            #timezone change to GMT+3 because the server runs UTC
+            utc_now = datetime.now(timezone.utc)
+            gmt_plus_3 = timezone(timedelta(hours=3))
+            gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
+
             self.running_chats[chat.id] = True
+            self.lastReminder[chat.id] = gmt_plus_3_time.hour
+
             logging.info(f"Timer activated by {user} in chat {(chat_name,chat.id)}")
             await query.answer()
             message = await bot.send_message(chat_id=chat.id, text="Таймер запущен")
+            await self.send_reminder(chat)
             await self.timed_delete_message(chat.id, message.message_id,  awaitTilDelete = 3)
 
             while self.running_chats[chat.id]:
-                #timezone change to GMT+3 because the server runs UTC
                 utc_now = datetime.now(timezone.utc)
                 gmt_plus_3 = timezone(timedelta(hours=3))
                 gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
-
+                #Check if it's a weekday and the time's between 6 - 23 hours 
                 if gmt_plus_3_time.weekday() < 5 and 6 <= gmt_plus_3_time.hour <= 23:  # Monday=0, Tuesday=1, ... , Sunday=6
-                    logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
-                    await self.send_reminder(chat.id)
-                
+                    #check the difference in hours between last reminder and current time
+                    if (gmt_plus_3_time.hour - self.lastReminder[chat.id]) >= 2:
+                        logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
+                        await self.send_reminder(chat)
+                        self.lastReminder[chat.id] = gmt_plus_3_time.hour
+                    else:
+                        logging.info(f"Not enough time has passed since last reminder for chat {chat_name}. Last reminder sent at {self.lastReminder[chat.id]} now {gmt_plus_3_time.strftime('%H:%M')} diff: {gmt_plus_3_time.hour - self.lastReminder[chat.id]}")
+                    
                 else:
                     logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next attempt at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
-
+                    self.lastReminder[chat.id] = gmt_plus_3_time.hour
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
 
     #stop the timer in a chat
-    async def stop_callback(self,query: CallbackQuery) -> None:
+    async def stop_callback(self,query: CallbackQuery):
         chat = query.message.chat
         user = query.from_user.username if query.from_user.username else query.from_user.first_name
         chat_name = chat.title if chat.title else chat.username
