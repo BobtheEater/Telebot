@@ -14,6 +14,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.filters.command import Command
 from aiogram.types import Message, CallbackQuery, Chat
+from aiogram.exceptions import TelegramBadRequest
 
 from keyboard import generate_menu
 
@@ -26,13 +27,15 @@ bot_started = False
 
 #Test class function for multiple chats
 class MultipleChatBot:
-    def __init__(self,):
+    def __init__(self):
         self.running = False
+        self.timeDiff = 4 #time to wait before sending a message in hours
         self.sleepTime = 10 * 60 
         self.lastReminder = dict() #dict to keep track of the last hour of a sent reminder
         self.functionality = dict()
         self.oldMenu = dict() #keep the keyboard menu to delete later
         self.running_chats = dict() #dict to keep track of chat timers
+
 
         self.keyboard = {"Добавь меня":"addme",
                          "Убери меня":"rmme",
@@ -40,13 +43,9 @@ class MultipleChatBot:
                          "Начать таймер":"starttimer",
                          "Остановить таймер":"stoptimer",
                         }
-        
-        #respective functions don't work for now
-
-        #Someone doesn't want this
-        #"Включить функционал":"functionality"
 
         dp.message.register(self.greet,Command(commands=["menu","Menu"]))
+        dp.message.register(self.get_all_members, Command("checkall"))
 
         #link commands with buttons
         dp.callback_query.register(self.send_single_reminder_callback,F.data == "sendreminder")
@@ -54,10 +53,7 @@ class MultipleChatBot:
         dp.callback_query.register(self.addme_callback,F.data == "addme")
         dp.callback_query.register(self.stop_callback,F.data == "stoptimer")
         dp.callback_query.register(self.rmme_callback,F.data == "rmme")
-        dp.callback_query.register(self.func,F.data == "functionality")
-
-        dp.message.register(self.get_all_members, Command("checkall"))
-    
+  
     #delete sent messages after a sleep time 
     async def timed_delete_message(self, chat_id: int, message_id: int,  awaitTilDelete: int = 5):
         await asyncio.sleep(awaitTilDelete)
@@ -66,28 +62,14 @@ class MultipleChatBot:
     #send a menu for a user and delete and old one if exists
     async def greet(self, message: Message):
         if message.chat.id in self.oldMenu:
-           await bot.delete_message(chat_id=message.chat.id, message_id=self.oldMenu[message.chat.id])
+            try:
+                await bot.delete_message(chat_id=message.chat.id, message_id=self.oldMenu[message.chat.id])
+            except(TelegramBadRequest) as e:
+                logging.info(e)
 
         oldMenu = await bot.send_message(chat_id=message.chat.id, text = "Помощник ЗС готов помогать", reply_markup=generate_menu(self.keyboard))
         self.oldMenu[message.chat.id] = oldMenu.message_id
         await self.timed_delete_message(message.chat.id, message.message_id, 0)
-
-    #Enables functionality (Useless)
-    async def func(self, query:CallbackQuery):
-        chat = query.message.chat
-        user = query.from_user.username if query.from_user.username else query.from_user.first_name
-        if self.functionality.get(chat.id):
-            self.functionality[chat.id] = False
-            text = "Функционал выключен"
-            logging.info(f"Functionality off in {(chat.id, chat.title if chat.title else chat.username)} by {user}")
-        else:
-            self.functionality[chat.id] = True
-            text = "Функционал включен"   
-            logging.info(f"Functionality on in {(chat.id, chat.title if chat.title else chat.username)} by {user}")
-
-        message = await query.message.answer(text = text)
-        await query.answer()
-        await self.timed_delete_message(chat.id, message.message_id)
 
     #escape the special characters in usernames and first and second name's
     def escape_markdown_v2(self, text:str):
@@ -166,15 +148,15 @@ class MultipleChatBot:
                 #Check if it's a weekday and the time's between 6 - 23 hours 
                 if gmt_plus_3_time.weekday() < 5 and 6 <= gmt_plus_3_time.hour <= 23:  # Monday=0, Tuesday=1, ... , Sunday=6
                     #check the difference in hours between last reminder and current time
-                    if (gmt_plus_3_time.hour - self.lastReminder[chat.id]) >= 2:
-                        logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
+                    if (gmt_plus_3_time.hour - self.lastReminder[chat.id]) >= self.timeDiff:
+                        logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next reminder at: {(gmt_plus_3_time + timedelta(hours=self.timeDiff)).strftime('%H:%M:%S')}")
                         await self.send_reminder(chat)
                         self.lastReminder[chat.id] = gmt_plus_3_time.hour
                     else:
                         logging.info(f"Not enough time has passed since last reminder for chat {chat_name}. Last reminder sent at {self.lastReminder[chat.id]} now {gmt_plus_3_time.strftime('%H:%M')} diff: {gmt_plus_3_time.hour - self.lastReminder[chat.id]}")
                     
                 else:
-                    logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next attempt at: {(gmt_plus_3_time + timedelta(seconds=self.sleepTime)).strftime('%H:%M:%S')}")
+                    logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} next attempt at: {(gmt_plus_3_time + timedelta(hours=self.timeDiff)).strftime('%H:%M:%S')}")
                     self.lastReminder[chat.id] = gmt_plus_3_time.hour
                 # Wait for sleepTime seconds before checking again
                 await asyncio.sleep(self.sleepTime)
@@ -247,8 +229,20 @@ class MultipleChatBot:
 
         #handler for all messagess, so you won't get "Update not handled"
         @dp.message()
-        async def message_handler(message: Message):
-            pass
+        async def chat_member_handler(message: Message):
+            #id Ника 1423976911
+            if message.from_user.id == 1423976911 and message.text == "иди в жопу":
+                text = "Сам иди"
+                await message.answer(text = text)
+                
+            if message.left_chat_member:
+                DBLoad.remove_member_from_list(message.left_chat_member)
+            elif message.new_chat_members:
+                for member in message.new_chat_members:
+                    DBLoad.new_chat_member_db_handler(member, message.chat.id)
+            else:
+                pass
+
 
 @dp.message(CommandStart())
 async def start(message: Message) -> None:

@@ -5,7 +5,7 @@ from sqlalchemy.engine import URL
 from dotenv import load_dotenv
 from os import getenv
 
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, User
 
 #Database setup
 class Member(SQLModel, table=True):
@@ -94,13 +94,53 @@ def add_member_to_list(call: Message | CallbackQuery):
             session.commit()
             return True
         
+def message_to_member_for_db_handler(user: User, chatId: int):
+    member = Member(
+            username = user.username,
+            #in case someone doesnt have a first name treat the last name as first 
+            first_name = user.first_name if user.first_name else user.last_name, 
+            telegram_id = user.id,
+            #check if the call was from a message just in case
+            chat_id = chatId
+            )
+    return member
+
+def new_chat_member_db_handler(user: User, chatId: int):
+    member = message_to_member_for_db_handler(user, chatId)
+    with Session(engine) as session:
+        statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
+        try: 
+            statement.one()
+            session.commit()
+            return False
+        except (NoResultFound):
+            session.add(member)
+            session.commit()
+            return True
+
+def chat_member_removed_dbhandler(user: User, chatId: int):
+    member = message_to_member_for_db_handler(user, chatId)
+    with Session(engine) as session:
+        statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
+        try: 
+            session.delete(statement.one())
+            session.commit()
+            return True 
+        except (NoResultFound, MultipleResultsFound):
+            session.commit()
+            return False
+        
+
 #if this code is run directly will drop the table and create a a new empty copy 
 if __name__ == "__main__":
     with Session(engine) as session:
-        statement = delete(Member)
+        """ statement = delete(Member)
         result = session.exec(statement)
+        session.commit()"""
+        statement = select(Member).where(Member.telegram_id == "", Member.chat_id == "")
+        session.exec(statement)
         session.commit()
-    SQLModel.metadata.create_all(engine)
+    #SQLModel.metadata.create_all(engine)
             
 
         
