@@ -244,31 +244,23 @@ class MultipleChatBot:
         member = event.new_chat_member.user
         if member.id != bot.id:
             if DBLoad.new_chat_member_db_handler(member, event.chat.id):
-                logging.info(f"""User {(member.username,
-                                        member.first_name,
-                                        member.id,
-                                        event.chat.id,)} added to the database""")      
+                logging.info(f"""User {(member.username, member.first_name,
+                                        member.id, event.chat.id,)} added to the database""")      
                     
             else: 
-                logging.info(f"""User {(member.username,
-                                        member.first_name,
-                                        member.id,
-                                        event.chat.id)} tried to be added to the database and was found is the database""")
+                logging.info(f"""User {(member.username, member.first_name,
+                                        member.id, event.chat.id)} tried to be added to the database and was found is the database""")
     
     #func to remove a member from the database upon leaving a group
     async def left_member_handler(self, event: ChatMemberUpdated):
         member = event.old_chat_member.user
         if member.id != bot.id:
             if DBLoad.chat_member_removed_db_handler(member, event.chat.id):
-                logging.info(f"""User {(member.username,
-                                        member.first_name,
-                                        member.id,
-                                        event.chat.id)} removed from the database""")
+                logging.info(f"""User {(member.username, member.first_name,
+                                        member.id, event.chat.id)} removed from the database""")
             else:
-                logging.info(f"""User {(member.username,
-                                        member.first_name,
-                                        member.id,
-                                        event.chat.id)} tried to be removed from the database and was not found""")
+                logging.info(f"""User {(member.username, member.first_name,
+                                        member.id, event.chat.id)} tried to be removed from the database and was not found""")
 
 
 @dp.message(CommandStart())
