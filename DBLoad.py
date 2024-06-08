@@ -118,7 +118,7 @@ def new_chat_member_db_handler(user: User, chatId: int):
             session.commit()
             return True
 
-def chat_member_removed_dbhandler(user: User, chatId: int):
+def chat_member_removed_db_handler(user: User, chatId: int):
     member = message_to_member_for_db_handler(user, chatId)
     with Session(engine) as session:
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
@@ -134,13 +134,10 @@ def chat_member_removed_dbhandler(user: User, chatId: int):
 #if this code is run directly will drop the table and create a a new empty copy 
 if __name__ == "__main__":
     with Session(engine) as session:
-        """ statement = delete(Member)
+        """statement = delete(Member)
         result = session.exec(statement)
         session.commit()"""
-        statement = select(Member).where(Member.telegram_id == "", Member.chat_id == "")
-        session.exec(statement)
-        session.commit()
-    #SQLModel.metadata.create_all(engine)
-            
+        statement = session.exec(select(Member).where(Member.username == "Vanya4896"))
+        print(statement.all())
 
-        
+    #SQLModel.metadata.create_all(engine)

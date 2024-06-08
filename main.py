@@ -11,9 +11,10 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, IS_MEMBER, IS_NOT_MEMBER
 from aiogram.filters.command import Command
-from aiogram.types import Message, CallbackQuery, Chat
+from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter
+from aiogram.types import Message, CallbackQuery, Chat, ChatMemberUpdated
 from aiogram.exceptions import TelegramBadRequest
 
 from keyboard import generate_menu
@@ -46,6 +47,10 @@ class MultipleChatBot:
 
         dp.message.register(self.greet,Command(commands=["menu","Menu"]))
         dp.message.register(self.get_all_members, Command("checkall"))
+        dp.message.register(self.nik_handler, F.text.lower() == "иди в жопу")
+
+        dp.chat_member.register(self.new_member_handler, ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
+        dp.chat_member.register(self.left_member_handler, ChatMemberUpdatedFilter(IS_MEMBER >> IS_NOT_MEMBER))
 
         #link commands with buttons
         dp.callback_query.register(self.send_single_reminder_callback,F.data == "sendreminder")
@@ -172,7 +177,7 @@ class MultipleChatBot:
         gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
         
         #check if the timer is on in a chat
-        if chat.id in self.running_chats:
+        if self.running_chats[chat.id]:
             self.running_chats[chat.id] = False
             logging.info(f"Timer was stopped at {gmt_plus_3_time.strftime('%d %H:%M:%S')} by {user} at chat {(chat_name,chat.id)}")
             message = await query.message.answer(text="Таймер остановлен")
@@ -227,21 +232,43 @@ class MultipleChatBot:
         await query.answer()
         await self.timed_delete_message(message.chat.id, message.message_id)
 
-        #handler for all messagess, so you won't get "Update not handled"
-        @dp.message()
-        async def chat_member_handler(message: Message):
-            #id Ника 1423976911
-            if message.from_user.id == 1423976911 and message.text == "иди в жопу":
-                text = "Сам иди"
-                await message.answer(text = text)
-                
-            if message.left_chat_member:
-                DBLoad.remove_member_from_list(message.left_chat_member)
-            elif message.new_chat_members:
-                for member in message.new_chat_members:
-                    DBLoad.new_chat_member_db_handler(member, message.chat.id)
+    
+    async def nik_handler(self, message: Message):
+        if message.from_user.id == getenv("NIK_ID"):
+            text = "Сам иди"
+            await message.reply(text = text)
+
+    #NEEDS TESTING
+    #func to add a member to the database upon entering a group
+    async def new_member_handler(self, event: ChatMemberUpdated):
+        member = event.new_chat_member.user
+        if member.id != bot.id:
+            if DBLoad.new_chat_member_db_handler(member, event.chat.id):
+                logging.info(f"""User {(member.username,
+                                        member.first_name,
+                                        member.id,
+                                        event.chat.id,)} added to the database""")      
+                    
+            else: 
+                logging.info(f"""User {(member.username,
+                                        member.first_name,
+                                        member.id,
+                                        event.chat.id)} tried to be added to the database and was found is the database""")
+    
+    #func to remove a member from the database upon leaving a group
+    async def left_member_handler(self, event: ChatMemberUpdated):
+        member = event.old_chat_member.user
+        if member.id != bot.id:
+            if DBLoad.chat_member_removed_db_handler(member, event.chat.id):
+                logging.info(f"""User {(member.username,
+                                        member.first_name,
+                                        member.id,
+                                        event.chat.id)} removed from the database""")
             else:
-                pass
+                logging.info(f"""User {(member.username,
+                                        member.first_name,
+                                        member.id,
+                                        event.chat.id)} tried to be removed from the database and was not found""")
 
 
 @dp.message(CommandStart())
@@ -262,7 +289,7 @@ async def main() -> None:
 
 async def webhook():
     async def handle(request):
-        return web.Response(text="Bot is running")
+        return web.Response(text="<b>Bot is running</b>")
 
     # Create an instance of the aiohttp web application
     app = web.Application()
