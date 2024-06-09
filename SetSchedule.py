@@ -5,12 +5,17 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message,CallbackQuery
 from aiogram.fsm.storage.redis import RedisStorage
 
+from dotenv import load_dotenv
+from os import getenv
+
 from MainMenu import timed_delete_message
 from redis.asyncio import Redis 
 
-r = Redis(host='redis-16730.c250.eu-central-1-1.ec2.redns.redis-cloud.com',
-          port=16730,
-          password='CRiqW8MtaQiXQJeDnzus8oidYSIRokHV')
+load_dotenv()
+
+r = Redis(host=getenv("REDIS_HOST"),
+          port=getenv("REDIS_PORT"),
+          password=getenv("REDIS_PASSWORD"))
 
 storage = RedisStorage(redis=r) 
 
@@ -22,9 +27,9 @@ class Schedule(StatesGroup):
 @router.callback_query(F.data == "setschedule")
 async def set_schedule(query: CallbackQuery, state: FSMContext):
     new_message = await query.message.answer(text="Введи время отсилания сообщений через кому.\n\nПример: 12,13,14,....",)
-    await timed_delete_message(message_id=new_message.message_id, chat_id=new_message.chat.id, awaitTilDelete=10)
     await query.answer()
     await state.set_state(Schedule.scheduledTime)
+    await timed_delete_message(message_id=new_message.message_id, chat_id=new_message.chat.id, awaitTilDelete=10)
     
 @router.message(Schedule.scheduledTime, F.text.strip().regexp(r"^\d+(,\d+)*$"))
 async def schedule_chosen(message: Message, state: FSMContext):

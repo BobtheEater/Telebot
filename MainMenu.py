@@ -106,7 +106,7 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
         gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
 
         running_chats[chat.id] = True
-        lastReminder[chat.id] = gmt_plus_3_time.hour
+        message_sent[chat.id] = True
 
         logging.info(f"Timer activated by {user} in chat {(chat_name,chat.id)}")
         await query.answer()
@@ -118,9 +118,9 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
             utc_now = datetime.now(timezone.utc)
             gmt_plus_3 = timezone(timedelta(hours=3))
             gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
-            #Check if it's a weekday and the time's between 6 - 23 hours 
+            #Check if time is in a schedule 
             if str(gmt_plus_3_time.hour) in chat_schedule['chosen_schedule']:
-                if not message_sent[chat.id]:
+                if not message_sent.get(chat.id, False):
                     logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
                     await send_reminder(chat)
                     message_sent[chat.id] = True
