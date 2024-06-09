@@ -1,23 +1,36 @@
 import asyncio
 import logging
-import sys
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Router
 from aiogram.filters.command import Command
-from aiogram.types import Message, InlineKeyboardButton, CallbackQuery  
+from aiogram.types import Message, InlineKeyboardButton 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.client.default import DefaultBotProperties
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 
 from os import getenv
 
 # Replace with your bot API token
 TOKEN = getenv("BOT_TOKEN")
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 # Create bot and dispatcher
-dp = Dispatcher()
+keyboardRouter = Router()
+oldMenu = dict() #keep the keyboard menu to delete later
 
+keyboard = {"Добавь меня":"addme",
+                    "Убери меня":"rmme",
+                    "Отправить напоминание":"sendreminder",
+                    "Начать таймер":"starttimer",
+                    "Остановить таймер":"stoptimer",
+                    "Назначить росписание":"setschedule",
+                }
 notRowOptions = ["addme", "rmme"]
+
+async def timed_delete_message( chat_id: int, message_id: int,  awaitTilDelete: int = 5):
+    await asyncio.sleep(awaitTilDelete)
+    await bot.delete_message(chat_id=chat_id, message_id=message_id)
 
 # Function to generate the menu
 def generate_menu(menu_options : dict[str,str]):
@@ -33,24 +46,16 @@ def generate_menu(menu_options : dict[str,str]):
             )
     return builder.as_markup()
 
-# Handler for the /menu command
-@dp.message(Command("menu"))
-async def show_menu(message: Message):
-    """Handle the /menu command and display the menu."""
-    await message.answer("Please select an option:", reply_markup=generate_menu())
+#send a menu for a user and delete and old one if exists
+@keyboardRouter.message(Command(commands=["menu","Menu"]))
+async def greet(message: Message):
+    if message.chat.id in oldMenu:
+        try:
+            await bot.delete_message(chat_id=message.chat.id, message_id=oldMenu[message.chat.id])
+        except(TelegramBadRequest) as e:
+            logging.info(e)
 
-# Handler for button clicks
-async def handle_button_click(query: CallbackQuery):
-    """Handle button clicks from the menu."""
-    await query.answer()  # Acknowledge the button click
-    selected_option = query.data
-    await query.message.answer(f"You selected: {selected_option}")
+    oldMessage = await bot.send_message(chat_id=message.chat.id, text = "Помощник ЗС готов помогать", reply_markup=generate_menu(keyboard))
+    oldMenu[message.chat.id] = oldMessage.message_id
+    await timed_delete_message(message.chat.id, message.message_id, 0)
 
-async def main():
-    bot = Bot(token=TOKEN,default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    # Start the bot
-    await dp.start_polling(bot)
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    asyncio.run(main())
