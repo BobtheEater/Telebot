@@ -88,7 +88,7 @@ async def cmd_cancel_no_state(query: CallbackQuery, state: FSMContext):
         text = "Раписание не назначено"
     new_message = await query.message.answer(text = text)
     await query.answer()
-    timed_delete_message(message_id=new_message.message_id, chat_id=new_message.chat.id)
+    await timed_delete_message(message_id=new_message.message_id, chat_id=new_message.chat.id)
 
 @router.message(StateFilter(None), Command(commands=["cancel"]))
 @router.message(StateFilter(None), F.text.lower() == "отмена")
