@@ -128,6 +128,7 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
                     message_sent[chat.id] = True
                 elif gmt_plus_3_time.hour != last_time_message_sent[chat.id]:
                     message_sent[chat.id] = False
+                    last_time_message_sent[chat.id] = gmt_plus_3_time.hour
                 else:
                     logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
             else:
