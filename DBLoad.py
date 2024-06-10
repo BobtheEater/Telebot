@@ -19,10 +19,10 @@ class Member(SQLModel, table=True):
 load_dotenv()
 connection_string = URL.create(
     drivername = getenv("DRIVERNAME"),
-    username = getenv("USERNAME"),
-    password = getenv("PASSWORD"),
-    host = getenv("HOST"),
-    port = getenv("PORT"),
+    username = getenv("DB_USERNAME"),
+    password = getenv("DB_PASSWORD"),
+    host = getenv("DB_HOST"),
+    port = getenv("DB_PORT"),
     database = getenv("DATABASE"),
 )
 

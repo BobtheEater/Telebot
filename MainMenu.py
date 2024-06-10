@@ -9,7 +9,7 @@ from os import getenv
 from aiogram import Bot, Router, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart, IS_MEMBER, IS_NOT_MEMBER
+from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER
 from aiogram.filters.command import Command
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter
 from aiogram.fsm.context import FSMContext
@@ -27,7 +27,6 @@ bot_started = False
 
 #Test class function for multiple chats
 running = False
-timeDiff = 4 #time to wait before sending a message in hours
 sleepTime = 10 * 60 
 lastReminder = dict() #dict to keep track of the last hour of a sent reminder
 functionality = dict()
@@ -86,7 +85,9 @@ async def send_single_reminder_callback(query: CallbackQuery):
 #send a reminder by GMT+3 time every cycle(sleepTime)
 @menurouter.callback_query(F.data == "starttimer")
 async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext):
+    last_time_message_sent = dict() #Dict to check the last time reminder was sent  
     message_sent = dict() #Dict to check if the reminder was sent this hour
+
     chat = query.message.chat
     user = query.from_user.username if query.from_user.username else query.from_user.first_name
     chat_name = chat.title if chat.title else chat.username
@@ -107,6 +108,7 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
 
         running_chats[chat.id] = True
         message_sent[chat.id] = True
+        last_time_message_sent[chat.id] = gmt_plus_3_time.hour #hour of a sent message of 
 
         logging.info(f"Timer activated by {user} in chat {(chat_name,chat.id)}")
         await query.answer()
@@ -119,11 +121,13 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
             gmt_plus_3 = timezone(timedelta(hours=3))
             gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
             #Check if time is in a schedule 
-            if str(gmt_plus_3_time.hour) in chat_schedule['chosen_schedule']:
+            if gmt_plus_3_time.hour in chat_schedule['chosen_schedule']:
                 if not message_sent.get(chat.id, False):
                     logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
                     await send_reminder(chat)
                     message_sent[chat.id] = True
+                elif gmt_plus_3_time.hour != last_time_message_sent[chat.id]:
+                    message_sent[chat.id] = False
                 else:
                     logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
             else:
@@ -224,17 +228,3 @@ async def left_member_handler(event: ChatMemberUpdated):
         else:
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id)} tried to be removed from the database and was not found""")
-
-
-@menurouter.message(CommandStart())
-async def start(message: Message) -> None:
-    global bot_started
-    chat = message.chat
-    if not bot_started:
-        await greet(message)
-        bot_started = True
-        logging.info(f"Bot instance created at chat {(chat.id, chat.title if chat.title else chat.username)}")
-    else:
-        await bot.send_message(chat_id = chat.id ,text="Бот уже запущен \nНапиши /menu для визова меню")
-        logging.info(f"Bot instance creation attempt at chat {(chat.id, chat.title if chat.title else chat.username)}")
-        timed_delete_message(message_id=message.message_id, chat_id=chat.id)
