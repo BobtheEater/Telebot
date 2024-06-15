@@ -9,7 +9,7 @@ from os import getenv
 from aiogram import Bot, Router, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER
+from aiogram.filters import JOIN_TRANSITION, LEAVE_TRANSITION
 from aiogram.filters.command import Command
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter
 from aiogram.fsm.context import FSMContext
@@ -199,14 +199,14 @@ async def addme_callback(query: CallbackQuery):
     await query.answer()
     await timed_delete_message(message.chat.id, message.message_id)
 
-@menurouter.message((F.text.lower() == "иди в жопу")&(F.from_user.id == getenv("NIK_ID") ))
+@menurouter.message((F.text.lower().contains("иди в жопу"))&(F.from_user.id == int(getenv("NIK_ID")) ))
 async def nik_handler(message: Message):
     text = "Сам иди"
     await message.reply(text = text)
 
 #NEEDS TESTING
 #func to add a member to the database upon entering a group
-@menurouter.chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
+@menurouter.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def new_member_handler(event: ChatMemberUpdated):
     member = event.new_chat_member.user
     if member.id != bot.id:
@@ -219,7 +219,7 @@ async def new_member_handler(event: ChatMemberUpdated):
                                     member.id, event.chat.id)} tried to be added to the database and was found is the database""")
 
 #func to remove a member from the database upon leaving a group
-@menurouter.chat_member(ChatMemberUpdatedFilter(IS_MEMBER >> IS_NOT_MEMBER))
+@menurouter.chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
 async def left_member_handler(event: ChatMemberUpdated):
     member = event.old_chat_member.user
     if member.id != bot.id:

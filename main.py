@@ -23,7 +23,7 @@ async def main() -> None:
     dp.include_routers(keyboard.keyboardRouter,
                        MainMenu.menurouter,
                        SetSchedule.router)
-    await dp.start_polling(bot, allowed_updates=[], skip_updates=True)
+    await dp.start_polling(bot, skip_updates=True)
 
 async def webhook():
     async def handle(request):
