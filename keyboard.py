@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from aiogram import Bot, Router
@@ -8,7 +7,7 @@ from aiogram.types import Message, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramBadRequest
 
-from .common import timed_delete_message 
+from common import timed_delete_message 
 
 # Create bot and dispatcher
 keyboardRouter = Router()

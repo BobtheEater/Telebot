@@ -25,7 +25,8 @@ async def main() -> None:
                        MainMenu.menurouter,
                        SetSchedule.router,
                        common.commonRouter)
-    await dp.start_polling(bot, skip_updates=True)
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 async def webhook():
     async def handle(request):

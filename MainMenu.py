@@ -2,7 +2,7 @@ import asyncio
 import logging
 import DBLoad
 
-from .common import timed_delete_message
+from common import timed_delete_message
 from random import randint
 from datetime import datetime, timedelta, timezone
 from os import getenv
@@ -122,6 +122,7 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
                     last_time_message_sent[chat.id] = gmt_plus_3_time.hour
                     #if reminder needs to be sent on consecutive hours reset the message sent
                 elif gmt_plus_3_time.hour != last_time_message_sent[chat.id]:
+                    logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
                     message_sent[chat.id] = False
                 else:
                     logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
@@ -143,7 +144,7 @@ async def stop_callback(query: CallbackQuery):
     gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
     
     #check if the timer is on in a chat
-    if running_chats[chat.id]:
+    if running_chats.get(chat.id, False):
         running_chats[chat.id] = False
         logging.info(f"Timer was stopped at {gmt_plus_3_time.strftime('%d %H:%M:%S')} by {user} at chat {(chat_name,chat.id)}")
         message = await query.message.answer(text="Таймер остановлен")
