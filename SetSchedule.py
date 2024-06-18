@@ -10,7 +10,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from dotenv import load_dotenv
 from os import getenv
 
-from MainMenu import timed_delete_message
+from common import timed_delete_message
 from redis.asyncio import Redis 
 
 load_dotenv()

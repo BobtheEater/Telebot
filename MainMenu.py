@@ -2,6 +2,7 @@ import asyncio
 import logging
 import DBLoad
 
+from .common import timed_delete_message
 from random import randint
 from datetime import datetime, timedelta, timezone
 from os import getenv
@@ -14,9 +15,6 @@ from aiogram.filters.command import Command
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, Chat, ChatMemberUpdated
-
-from keyboard import greet
-
 
 #Bot setup
 TOKEN = getenv("BOT_TOKEN")
@@ -31,11 +29,6 @@ sleepTime = 10 * 60
 lastReminder = dict() #dict to keep track of the last hour of a sent reminder
 functionality = dict()
 running_chats = dict() #dict to keep track of chat timers
-
-#delete sent messages after a sleep time 
-async def timed_delete_message( chat_id: int, message_id: int,  awaitTilDelete: int = 5):
-    await asyncio.sleep(awaitTilDelete)
-    await bot.delete_message(chat_id=chat_id, message_id=message_id)
 
 #escape the special characters in usernames and first and second name's
 def escape_markdown_v2(text:str):
@@ -126,9 +119,10 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
                     logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
                     await send_reminder(chat)
                     message_sent[chat.id] = True
+                    last_time_message_sent[chat.id] = gmt_plus_3_time.hour
+                    #if reminder needs to be sent on consecutive hours reset the message sent
                 elif gmt_plus_3_time.hour != last_time_message_sent[chat.id]:
                     message_sent[chat.id] = False
-                    last_time_message_sent[chat.id] = gmt_plus_3_time.hour
                 else:
                     logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
             else:
@@ -171,7 +165,7 @@ async def get_all_members( message: Message):
 @menurouter.callback_query(F.data == "rmme")
 async def rmme_callback(query: CallbackQuery):
     #check if the user is in the database
-    if DBLoad.remove_member_from_list(query):
+    if DBLoad.remove_member_from_db(query.from_user, query.message.chat.id):
         message =  await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был удален из списка") 
         logging.info(f"""User {(query.from_user.username, query.from_user.first_name,
                             query.from_user.id, query.message.chat.id)} removed from the database""")
@@ -186,7 +180,7 @@ async def rmme_callback(query: CallbackQuery):
 @menurouter.callback_query(F.data == "addme")
 async def addme_callback(query: CallbackQuery):
     #check if the person is not in the database
-    if DBLoad.add_member_to_list(query):
+    if DBLoad.add_member_to_db(query.from_user, query.message.chat.id):
         message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был успешно добавлен в список")
         logging.info(f"""User {(query.from_user.username, query.from_user.first_name,
                                 query.from_user.id, query.message.chat.id,)} added to the database""")      
@@ -199,21 +193,16 @@ async def addme_callback(query: CallbackQuery):
     await query.answer()
     await timed_delete_message(message.chat.id, message.message_id)
 
-@menurouter.message((F.text.lower().contains("иди в жопу"))&(F.from_user.id == int(getenv("NIK_ID")) ))
-async def nik_handler(message: Message):
-    text = "Сам иди"
-    await message.reply(text = text)
-
 #NEEDS TESTING
 #func to add a member to the database upon entering a group
 @menurouter.chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def new_member_handler(event: ChatMemberUpdated):
     member = event.new_chat_member.user
     if member.id != bot.id:
-        if DBLoad.new_chat_member_db_handler(member, event.chat.id):
+        if DBLoad.add_member_to_db(member, event.chat.id):
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id,)} added to the database""")      
-                
+            await event.answer(text= f"Пользователь {member.first_name} был успешно добавлен в список")        
         else: 
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id)} tried to be added to the database and was found is the database""")
@@ -223,9 +212,10 @@ async def new_member_handler(event: ChatMemberUpdated):
 async def left_member_handler(event: ChatMemberUpdated):
     member = event.old_chat_member.user
     if member.id != bot.id:
-        if DBLoad.chat_member_removed_db_handler(member, event.chat.id):
+        if DBLoad.remove_member_from_db(member, event.chat.id):
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id)} removed from the database""")
+            await event.answer(text=f"Пользователь {member.first_name} был удален из списка")
         else:
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id)} tried to be removed from the database and was not found""")

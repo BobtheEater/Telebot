@@ -4,6 +4,7 @@ import sys
 import SetSchedule
 import keyboard
 import MainMenu
+import common
 
 from os import getenv
 from aiohttp import web
@@ -22,7 +23,8 @@ dp = Dispatcher(fsm_strategy=FSMStrategy.CHAT,storage=SetSchedule.storage)
 async def main() -> None:
     dp.include_routers(keyboard.keyboardRouter,
                        MainMenu.menurouter,
-                       SetSchedule.router)
+                       SetSchedule.router,
+                       common.commonRouter)
     await dp.start_polling(bot, skip_updates=True)
 
 async def webhook():

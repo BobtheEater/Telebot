@@ -33,14 +33,14 @@ engine = create_engine(connection_string)
 def to_dict(obj):
     return {column.name: getattr(obj, column.name) for column in obj.__table__.columns}
 
-def call_to_member(call: Message | CallbackQuery):
+def call_to_member(user: User, chat_id: int):
     member = Member(
-            username = call.from_user.username,
+            username = user.username,
             #in case someone doesnt have a first name treat the last name as first 
-            first_name = call.from_user.first_name if call.from_user.first_name else call.from_user.last_name, 
-            telegram_id = call.from_user.id,
+            first_name = user.first_name if user.first_name else user.last_name, 
+            telegram_id = user.id,
             #check if the call was from a message just in case
-            chat_id = call.chat.id if isinstance(call, Message) else call.message.chat.id, 
+            chat_id = chat_id  
         )
     return member
 
@@ -68,8 +68,8 @@ def get_all_members() -> dict[str: str|int]:
     return membersDict
 
 #remove member from the database
-def remove_member_from_list(call: Message | CallbackQuery):
-    member = call_to_member(call)
+def remove_member_from_db(user: User, chat_id: int):
+    member = call_to_member(user, chat_id)
     with Session(engine) as session:
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
         try: 
@@ -81,8 +81,8 @@ def remove_member_from_list(call: Message | CallbackQuery):
             return False
 
 #add member to the databasae     
-def add_member_to_list(call: Message | CallbackQuery):
-    member = call_to_member(call)
+def add_member_to_db(user: User, chat_id: int):
+    member = call_to_member(user, chat_id)
     with Session(engine) as session:
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
         try: 
@@ -93,43 +93,6 @@ def add_member_to_list(call: Message | CallbackQuery):
             session.add(member)
             session.commit()
             return True
-        
-def message_to_member_for_db_handler(user: User, chatId: int):
-    member = Member(
-            username = user.username,
-            #in case someone doesnt have a first name treat the last name as first 
-            first_name = user.first_name if user.first_name else user.last_name, 
-            telegram_id = user.id,
-            #check if the call was from a message just in case
-            chat_id = chatId
-            )
-    return member
-
-def new_chat_member_db_handler(user: User, chatId: int):
-    member = message_to_member_for_db_handler(user, chatId)
-    with Session(engine) as session:
-        statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
-        try: 
-            statement.one()
-            session.commit()
-            return False
-        except (NoResultFound):
-            session.add(member)
-            session.commit()
-            return True
-
-def chat_member_removed_db_handler(user: User, chatId: int):
-    member = message_to_member_for_db_handler(user, chatId)
-    with Session(engine) as session:
-        statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
-        try: 
-            session.delete(statement.one())
-            session.commit()
-            return True 
-        except (NoResultFound, MultipleResultsFound):
-            session.commit()
-            return False
-        
 
 #if this code is run directly will drop the table and create a a new empty copy 
 if __name__ == "__main__":
@@ -137,7 +100,7 @@ if __name__ == "__main__":
         """statement = delete(Member)
         result = session.exec(statement)
         session.commit()"""
-        statement = session.exec(select(Member).where(Member.username == "Vanya4896"))
-        print(statement.all())
+        statement = session.exec(select(Member).where(Member.username == "KaidoZoom")).first() 
+        session.commit()
 
     #SQLModel.metadata.create_all(engine)
