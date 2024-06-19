@@ -49,5 +49,5 @@ async def greet(message: Message, bot: Bot):
 
     oldMessage = await bot.send_message(chat_id=message.chat.id, text = "Помощник ЗС готов помогать", reply_markup=generate_menu(keyboard))
     oldMenu[message.chat.id] = oldMessage.message_id
-    await timed_delete_message(message.chat.id, message.message_id, 0)
+    await timed_delete_message(message, 0)
 

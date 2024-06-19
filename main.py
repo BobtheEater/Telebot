@@ -3,8 +3,9 @@ import logging
 import sys
 import SetSchedule
 import keyboard
-import MainMenu
+import Timer
 import common
+import Member_menagement as Mm
 
 from os import getenv
 from aiohttp import web
@@ -22,9 +23,10 @@ dp = Dispatcher(fsm_strategy=FSMStrategy.CHAT,storage=SetSchedule.storage)
 
 async def main() -> None:
     dp.include_routers(keyboard.keyboardRouter,
-                       MainMenu.menurouter,
+                       Timer.menurouter,
                        SetSchedule.router,
-                       common.commonRouter)
+                       common.commonRouter,
+                       Mm.memberrouter)
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
@@ -56,7 +58,6 @@ if __name__ == "__main__":
                         stream=sys.stdout,
                         #filename="BotLogs.log",
                         encoding='utf-8',
-                        format='%(asctime)s - %(levelname)s - %(message)s',
-                        datefmt='%d %H:%M:%S',)
+                        format='%(levelname)s - %(message)s',)
     
     asyncio.run(create_coroutines()) 
