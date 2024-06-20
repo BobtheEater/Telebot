@@ -19,7 +19,7 @@ async def timed_delete_message(message: Message,  awaitTilDelete: int = 5):
     await asyncio.sleep(awaitTilDelete)
     await message.delete()
 
-@commonRouter.message((F.text.lower().contains("иди в жопу"))&(F.from_user.id == int(getenv("NIK_ID")) ))
+@commonRouter.message((F.text.lower().contains("иди"))&(F.from_user.id == int(getenv("NIK_ID")) ))
 async def nik_handler(message: Message):
     text = "Сам иди"
     await message.reply(text = text)

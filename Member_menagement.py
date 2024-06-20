@@ -37,10 +37,11 @@ async def get_reminder_text(chat:Chat):
             first_name = escape_markdown_v2(member['first_name'])
             text += f"[{first_name}](tg://user?id={member['telegram_id']}) "
 
-        text += call  
-        return text
+    text += call 
     
     logging.info(f"Message | {text} | sent at chat {(chat_name, chat.id)}")
+     
+    return text
 
 #secret command to get all of the database entries
 @memberrouter.message(Command("checkall"))
