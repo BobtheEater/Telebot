@@ -34,7 +34,7 @@ async def send_single_reminder_callback(query: CallbackQuery):
 
     logging.info(f"Single reminder sent by {user}")
     text = await get_reminder_text(chat=chat)
-    await query.message.answer(text = text)
+    await query.message.answer(text = text, parse_mode=ParseMode.MARKDOWN_V2)
 
     await query.answer()
 
@@ -69,9 +69,6 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
         await query.answer()
 
         message = await query.message.answer(text="Таймер запущен")
-        text = await get_reminder_text(chat)
-        await query.message.answer(text=text)
-
         await timed_delete_message(message, awaitTilDelete = 3)
         
         await runtimer(chat=chat, query=query, state = state)
@@ -79,6 +76,9 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
 async def runtimer(chat: Chat, query: CallbackQuery, state: FSMContext):
     chat_name = chat.title if chat.title else chat.username
     chat_schedule =  await state.get_data()
+
+    text = await get_reminder_text(chat)
+    await query.message.answer(text=text, parse_mode=ParseMode.MARKDOWN_V2)
 
     while running_chats[chat.id]:
             gmt_plus_3_time = get_time_gmt3()
@@ -91,7 +91,7 @@ async def runtimer(chat: Chat, query: CallbackQuery, state: FSMContext):
                     last_time_message_sent[chat.id] = gmt_plus_3_time.hour
                     
                     text = await get_reminder_text(chat)
-                    await query.message.answer(text=text)
+                    await query.message.answer(text=text, parse_mode=ParseMode.MARKDOWN_V2)
                     
                     logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
                 #if reminder needs to be sent on consecutive hours reset the message_sent
