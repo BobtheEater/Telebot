@@ -4,6 +4,8 @@ from aiogram import Bot, F, Router
 from aiogram.types import Message
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
 
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
@@ -31,3 +33,11 @@ def get_time_gmt3():
     gmt_plus_3_time = utc_now.astimezone(gmt_plus_3)
     
     return gmt_plus_3_time
+
+@commonRouter.message(StateFilter(None), Command(commands=["cancel"]))
+@commonRouter.message(StateFilter(None), F.text.lower() == "отмена")
+async def cmd_cancel_no_state(message: Message, state: FSMContext):
+    new_message = await message.answer(text="Нечего отменять")
+
+    await timed_delete_message(message)
+    await timed_delete_message(new_message)

@@ -87,7 +87,6 @@ def add_member_to_db(user: User, chat_id: int):
         statement = session.exec(select(Member).where(Member.telegram_id == member.telegram_id, Member.chat_id == member.chat_id))
         try: 
             statement.one()
-            session.commit()
             return False
         except (NoResultFound):
             session.add(member)

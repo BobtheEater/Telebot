@@ -14,6 +14,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.strategy import FSMStrategy
+from aiogram.enums.update_type import UpdateType as UT
 
 #Bot setup
 TOKEN = getenv("BOT_TOKEN")
@@ -28,7 +29,7 @@ async def main() -> None:
                        common.commonRouter,
                        Mm.memberrouter)
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=[UT.CALLBACK_QUERY ,UT.MESSAGE, UT.CHAT_MEMBER])
 
 async def webhook():
     async def handle(request):

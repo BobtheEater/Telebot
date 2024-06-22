@@ -55,11 +55,11 @@ async def get_all_members(message: Message, bot: Bot):
 async def rmme_callback(query: CallbackQuery, bot: Bot):
     #check if the user is in the database
     if DBLoad.remove_member_from_db(query.from_user, query.message.chat.id):
-        message =  await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был удален из списка") 
+        message =  await query.message.answer(text=f"Пользователь {query.from_user.first_name} был удален из списка") 
         logging.info(f"""User {(query.from_user.username, query.from_user.first_name,
                             query.from_user.id, query.message.chat.id)} removed from the database""")
     else:
-        message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} не в списке")
+        message = await query.message.answer(text=f"Пользователь {query.from_user.first_name} не в списке")
         logging.info(f"""User {(query.from_user.username, query.from_user.first_name,
                                 query.from_user.id, query.message.chat.id)} tried to be removed from the database and was not found""")
     await query.answer()
@@ -70,12 +70,12 @@ async def rmme_callback(query: CallbackQuery, bot: Bot):
 async def addme_callback(query: CallbackQuery, bot: Bot):
     #check if the person is not in the database
     if DBLoad.add_member_to_db(query.from_user, query.message.chat.id):
-        message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} был успешно добавлен в список")
+        message = await query.message.answer(text=f"Пользователь {query.from_user.first_name} был успешно добавлен в список")
         logging.info(f"""User {(query.from_user.username, query.from_user.first_name,
                                 query.from_user.id, query.message.chat.id,)} added to the database""")      
                 
     else:
-        message = await bot.send_message(query.message.chat.id, text=f"Пользователь {query.from_user.first_name} уже в есть в списке") 
+        message = await query.message.answer(text=f"Пользователь {query.from_user.first_name} уже в есть в списке") 
         logging.info(f"""User {(query.from_user.username, query.from_user.first_name,
                                 query.from_user.id, query.message.chat.id)} tried to be added to the database and was found is the database""")
         
@@ -99,7 +99,7 @@ async def new_member_handler(event: ChatMemberUpdated, bot: Bot):
 #func to remove a member from the database upon leaving a group
 @memberrouter.chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
 async def left_member_handler(event: ChatMemberUpdated, bot: Bot):
-    member = event.old_chat_member.user
+    member = event.new_chat_member.user
     if member.id != bot.id:
         if DBLoad.remove_member_from_db(member, event.chat.id):
             logging.info(f"""User {(member.username, member.first_name,

@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import Router, F
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message,CallbackQuery
@@ -33,12 +33,12 @@ async def set_schedule(query: CallbackQuery, state: FSMContext):
     await query.answer()
     await state.set_state(Schedule.scheduledTime)
     await timed_delete_message(new_message, awaitTilDelete=10)
-    
+
 @router.message(Schedule.scheduledTime, Command(commands=["cancel"]))
 @router.message(Schedule.scheduledTime, F.text.lower() == "отмена")
 async def cmd_cancel(message: Message, state: FSMContext):
     await state.set_state(state = None)
-    new_message = await message.answer(text="Действие отменено")
+    new_message = await message.answer(text="Установка расписания отмененa")
 
     chat = message.chat
     user = message.from_user.username if  message.from_user.username else message.from_user.first_name
@@ -46,7 +46,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
     logging.info(f"Schedule creation canceled in chat {(chat.id,chat_name)} by {user}")
     
     await timed_delete_message(message)
-    await timed_delete_message(new_message, 10)
+    await timed_delete_message(new_message)
 
 @router.message(Schedule.scheduledTime, F.text.strip().regexp(r"^\d+(,\d+)*$"))
 async def schedule_chosen(message: Message, state: FSMContext):
@@ -89,12 +89,4 @@ async def cmd_cancel_no_state(query: CallbackQuery, state: FSMContext):
         text = "Раписание не назначено"
     new_message = await query.message.answer(text = text)
     await query.answer()
-    await timed_delete_message(new_message)
-
-@router.message(StateFilter(None), Command(commands=["cancel"]))
-@router.message(StateFilter(None), F.text.lower() == "отмена")
-async def cmd_cancel_no_state(message: Message, state: FSMContext):
-    new_message = await message.answer(text="Нечего отменять")
-
-    await timed_delete_message(message)
     await timed_delete_message(new_message)
