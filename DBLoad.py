@@ -5,7 +5,7 @@ from sqlalchemy.engine import URL
 from dotenv import load_dotenv
 from os import getenv
 
-from aiogram.types import Message, CallbackQuery, User
+from aiogram.types import User
 
 #Database setup
 class Member(SQLModel, table=True):
@@ -79,6 +79,9 @@ def remove_member_from_db(user: User, chat_id: int):
         except (NoResultFound, MultipleResultsFound):
             session.commit()
             return False
+        #recursively retry untill connection is reestablished 
+        except (OperationalError):
+            remove_member_from_db(user = user, chat_id = chat_id)
 
 #add member to the databasae     
 def add_member_to_db(user: User, chat_id: int):
@@ -92,6 +95,9 @@ def add_member_to_db(user: User, chat_id: int):
             session.add(member)
             session.commit()
             return True
+        #recursively retry untill connection is reestablished 
+        except (OperationalError):
+            add_member_to_db(user = user, chat_id = chat_id)
 
 #if this code is run directly will drop the table and create a a new empty copy 
 if __name__ == "__main__":

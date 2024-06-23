@@ -91,10 +91,13 @@ async def new_member_handler(event: ChatMemberUpdated, bot: Bot):
         if DBLoad.add_member_to_db(member, event.chat.id):
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id,)} added to the database""")      
-            await event.answer(text= f"Пользователь {member.first_name} был успешно добавлен в список")        
+            message = await event.answer(text= f"Пользователь {member.first_name} был успешно добавлен в список")        
         else: 
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id)} tried to be added to the database and was found is the database""")
+            message = await event.answer(text=f"Пользователь {member.first_name} уже в есть в списке")
+        
+        await timed_delete_message(message, 3)
 
 #func to remove a member from the database upon leaving a group
 @memberrouter.chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
@@ -104,7 +107,10 @@ async def left_member_handler(event: ChatMemberUpdated, bot: Bot):
         if DBLoad.remove_member_from_db(member, event.chat.id):
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id)} removed from the database""")
-            await event.answer(text=f"Пользователь {member.first_name} был удален из списка")
+            message = await event.answer(text=f"Пользователь {member.first_name} был удален из списка")
         else:
             logging.info(f"""User {(member.username, member.first_name,
                                     member.id, event.chat.id)} tried to be removed from the database and was not found""")
+            message = await event.answer(text=f"Пользователь {member.first_name} не в списке")
+        
+        await timed_delete_message(message, 3)
