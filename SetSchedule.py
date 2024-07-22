@@ -34,8 +34,10 @@ async def choose_schedule(query: CallbackQuery, state: FSMContext):
     menu = {"Назначить время":"setscheduletime",
             "Назначить день":"setscheduleday",}
 
-    await query.message.answer(text = "Назначить дни или само время?", reply_markup=generate_menu(menu))
+    new_message = await query.message.answer(text = "Назначить дни или само время?", reply_markup=generate_menu(menu))
     await query.answer()
+
+    await timed_delete_message(new_message, awaitTilDelete=10)
 
 #Section to set the time of day in a schedule
 @router.callback_query(F.data == "setscheduletime")
@@ -142,13 +144,14 @@ async def cmd_cancel_no_state(query: CallbackQuery, state: FSMContext):
     int_to_days = {0:"Пн",1:"Вт",2:"Ср",3:"Чт",4:"Пт",5:"Сб",6:"Вс",}
 
     chat_schedule = await state.get_data()
-    if chat_schedule:
+    if chat_schedule['chosen_schedule']:
         text = "Время напоминаний: "
         for time in chat_schedule['chosen_schedule']:
             if time == chat_schedule['chosen_schedule'][-1]:
                 text += str(time)
             else:
                 text += str(time)+", "
+    if chat_schedule['chosen_days']:
         text += "\nДни напоминаний: "        
         for day in chat_schedule['chosen_days']:
             if day == chat_schedule['chosen_days'][-1]:
