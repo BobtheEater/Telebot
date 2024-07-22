@@ -80,7 +80,7 @@ async def addme_callback(query: CallbackQuery, bot: Bot):
                                 query.from_user.id, query.message.chat.id)} tried to be added to the database and was found is the database""")
         
     await query.answer()
-    await timed_delete_message(message.chat.id, message.message_id)
+    await timed_delete_message(message, 3)
 
 #NEEDS TESTING
 #func to add a member to the database upon entering a group

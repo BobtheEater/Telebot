@@ -101,11 +101,11 @@ def add_member_to_db(user: User, chat_id: int):
 
 #if this code is run directly will drop the table and create a a new empty copy 
 if __name__ == "__main__":
-    with Session(engine) as session:
-        """statement = delete(Member)
+    """with Session(engine) as session:
+        statement = session.exec(select(Member).where(Member.username == "Maks_Winner")).first() 
+        statement = delete(Member)
         result = session.exec(statement)
         session.commit()"""
-        statement = session.exec(select(Member).where(Member.username == "KaidoZoom")).first() 
-        session.commit()
+        
 
     #SQLModel.metadata.create_all(engine)

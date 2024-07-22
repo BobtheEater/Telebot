@@ -16,9 +16,8 @@ TOKEN = getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 menurouter = Router()
-timer_started = False
 
-sleepTime = 10 * 60 
+sleepTime = 20 * 60 
 lastReminder = dict() #dict to keep track of the last hour of a sent reminder
 functionality = dict()
 running_chats = dict() #dict to keep track of chat timers
@@ -38,7 +37,7 @@ async def send_single_reminder_callback(query: CallbackQuery):
 
     await query.answer()
 
-#send a reminder by GMT+3 time every cycle(sleepTime)
+#start a thread for each chat that had the timer activated
 @menurouter.callback_query(F.data == "starttimer")
 async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext):
     chat = query.message.chat
@@ -58,12 +57,7 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
         message =  await query.message.answer(text="Розписание не назначено")
         await query.answer()
     else:
-        gmt_plus_3_time = get_time_gmt3()
-        global timer_started
-
-        running_chats[chat.id] = True
-        message_sent[chat.id] = True
-        last_time_message_sent[chat.id] = gmt_plus_3_time.hour #hour of a sent message 
+        running_chats[chat.id] = True 
 
         logging.info(f"Timer activated by {user} in chat {(chat_name,chat.id)}")
         await query.answer()
@@ -73,17 +67,24 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
         
         await runtimer(chat=chat, query=query, state = state)
 
+#send a reminder by GMT+3 time every cycle(sleepTime)
 async def runtimer(chat: Chat, query: CallbackQuery, state: FSMContext):
     chat_name = chat.title if chat.title else chat.username
     chat_schedule =  await state.get_data()
 
-    text = await get_reminder_text(chat)
-    await query.message.answer(text=text, parse_mode=ParseMode.MARKDOWN_V2)
+    #convert int values to readeble days of the week
+    int_to_days = {0:"Пн",1:"Вт",2:"Ср",3:"Чт",4:"Пт",5:"Сб",6:"Вс",}
+    day_schedule = [int_to_days[day] for day in chat_schedule['chosen_days']]
 
     while running_chats[chat.id]:
             gmt_plus_3_time = get_time_gmt3()
+            weekday = gmt_plus_3_time.weekday()
+            
+            log_text_fail = f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule'], day_schedule}"
+            log_text_success = f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule'], day_schedule}"
+            
             #Check if time is in a schedule 
-            if gmt_plus_3_time.hour in chat_schedule['chosen_schedule']:
+            if gmt_plus_3_time.hour in chat_schedule['chosen_schedule'] and weekday in chat_schedule['chosen_days']:
                 #check if a message wasn't sent this hour if in a schedule 
                 if not message_sent.get(chat.id, False):
                     #set that the message was sent recently to true and update last hour the message was sent
@@ -93,20 +94,19 @@ async def runtimer(chat: Chat, query: CallbackQuery, state: FSMContext):
                     text = await get_reminder_text(chat)
                     await query.message.answer(text=text, parse_mode=ParseMode.MARKDOWN_V2)
                     
-                    logging.info(f"Reminder sent at: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
+                    logging.info(log_text_success)
                 #if reminder needs to be sent on consecutive hours reset the message_sent
                 elif gmt_plus_3_time.hour != last_time_message_sent[chat.id]:
                     message_sent[chat.id] = False
-                    logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
+                    logging.info(log_text_fail)
                     
                 #if the time for a message is inapropriete log it 
                 else:
-                    logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} last sent message at {last_time_message_sent[chat.id]} chat's schedule: {chat_schedule['chosen_schedule']}")
+                    logging.info(log_text_fail)
             #if time isn't in a schedule set the message_sent to false to be ready to send a new message
             else:
                 message_sent[chat.id] = False
-                logging.info(f"Inappropriate time for a reminder: {gmt_plus_3_time.strftime('%H:%M:%S')} in chat {chat_name} chat's schedule: {chat_schedule['chosen_schedule']}")
-            # Wait for sleepTime seconds before checking again
+                logging.info(log_text_fail)
             await asyncio.sleep(sleepTime)
 
 #stop the timer in a chat
