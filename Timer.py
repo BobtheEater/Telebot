@@ -53,9 +53,13 @@ async def send_weekday_message_callback(query: CallbackQuery, state: FSMContext)
         
         logging.info(f"{user} tried to activate timer in chat {(chat_name,chat.id)} while timer is already active")
     
-    elif not chat_schedule:
+    elif not chat_schedule['chosen_schedule']:
         message =  await query.message.answer(text="Розписание не назначено")
         await query.answer()
+    elif not chat_schedule['chosen_days']:
+        message =  await query.message.answer(text="Дни не назанчены")
+        await query.answer()
+        
     else:
         running_chats[chat.id] = True 
 
