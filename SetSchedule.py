@@ -32,9 +32,9 @@ class Schedule(StatesGroup):
 @router.callback_query(StateFilter(None), F.data == "setschedule")
 async def choose_schedule(query: CallbackQuery, state: FSMContext):
     menu = {"Назначить время":"setscheduletime",
-            "Назаначить день":"setscheduleday",}
+            "Назначить день":"setscheduleday",}
 
-    await query.message.answer(text = "Помощник ЗС готов помогать", reply_markup=generate_menu(menu))
+    await query.message.answer(text = "Назначить дни или само время?", reply_markup=generate_menu(menu))
     await query.answer()
 
 #Section to set the time of day in a schedule
